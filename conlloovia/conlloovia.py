@@ -32,39 +32,7 @@ class ConllooviaAllocator:
 
         self.lPproblem.solve()
 
-        logging.info("Solution (only variables different to 0):")
-        for i in self.x:
-            if self.x[i].value() > 0:
-                logging.info(f"  X_{i} = {self.x[i].value()}")
-        logging.info("")
-
-        for i in self.z:
-            if self.z[i].value() > 0:
-                logging.info(f"  Z_{i} = {self.z[i].value()}")
-
-        logging.info("Status: %s", LpStatus[self.lPproblem.status])
-        logging.info("Total cost: %f", value(self.lPproblem.objective))
-
-        vm_alloc = {}
-        for vm_name in self.vm_names:
-            vm = self.vms[vm_name]
-            vm_alloc[vm] = self.x[vm_name].value()
-
-        container_alloc = {}
-        for c_name in self.container_names:
-            container = self.containers[c_name]
-            container_alloc[container] = self.z[c_name].value()
-
-        alloc = Allocation(
-            vms=vm_alloc,
-            containers=container_alloc,
-        )
-
-        sol = Solution(
-            problem=self.problem, alloc=alloc, cost=value(self.lPproblem.objective)
-        )
-
-        return sol
+        return self.__create_solution()
 
     def __create_vars(self):
         """Creates the variables for the linear programming algorithm."""
@@ -155,3 +123,41 @@ class ConllooviaAllocator:
                 <= self.x[vm_name] * BIG_M,
                 f"Enough_instances_in_vm_{vm_name}",
             )
+
+    def __create_solution(self):
+        self.__log_solution()
+
+        vm_alloc = {}
+        for vm_name in self.vm_names:
+            vm = self.vms[vm_name]
+            vm_alloc[vm] = self.x[vm_name].value()
+
+        container_alloc = {}
+        for c_name in self.container_names:
+            container = self.containers[c_name]
+            container_alloc[container] = self.z[c_name].value()
+
+        alloc = Allocation(
+            vms=vm_alloc,
+            containers=container_alloc,
+        )
+
+        sol = Solution(
+            problem=self.problem, alloc=alloc, cost=value(self.lPproblem.objective)
+        )
+
+        return sol
+
+    def __log_solution(self):
+        logging.info("Solution (only variables different to 0):")
+        for i in self.x:
+            if self.x[i].value() > 0:
+                logging.info(f"  X_{i} = {self.x[i].value()}")
+        logging.info("")
+
+        for i in self.z:
+            if self.z[i].value() > 0:
+                logging.info(f"  Z_{i} = {self.z[i].value()}")
+
+        logging.info("Status: %s", LpStatus[self.lPproblem.status])
+        logging.info("Total cost: %f", value(self.lPproblem.objective))

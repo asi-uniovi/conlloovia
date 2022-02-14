@@ -1,3 +1,4 @@
+import logging
 from typing import List, Dict, Tuple
 
 from pulp import LpVariable, lpSum, LpProblem, LpMinimize, LpStatus, value
@@ -28,22 +29,20 @@ class ConllooviaAllocator:
         self.create_objective()
         self.create_restrictions()
 
-        self.lPproblem.writeLP("container_problem.lp")
-
         self.lPproblem.solve()
 
-        print("Solution (only variables different to 0):")
+        logging.info("Solution (only variables different to 0):")
         for i in self.x:
             if self.x[i].value() > 0:
-                print(f"  X_{i} = {self.x[i].value()}")
-        print()
+                logging.info(f"  X_{i} = {self.x[i].value()}")
+        logging.info("")
 
         for i in self.z:
             if self.z[i].value() > 0:
-                print(f"  Z_{i} = {self.z[i].value()}")
+                logging.info(f"  Z_{i} = {self.z[i].value()}")
 
-        print("Status:", LpStatus[self.lPproblem.status])
-        print("Total cost:", value(self.lPproblem.objective))
+        logging.info("Status: %s", LpStatus[self.lPproblem.status])
+        logging.info("Total cost: %f", value(self.lPproblem.objective))
 
         vm_alloc = {}
         for vm_name in self.vm_names:
@@ -68,14 +67,14 @@ class ConllooviaAllocator:
 
     def create_vars(self):
         MAX_CONTAINERS = 10
-        print(f"TODO: set a limit to max containers. Now: {MAX_CONTAINERS}")
+        logging.warning(f"TODO: set a limit to max containers. Now: {MAX_CONTAINERS}")
 
         MAX_VCORES = 640
-        print(f"TODO: MAX_VCORES: {MAX_VCORES}")
+        logging.warning(f"TODO: MAX_VCORES: {MAX_VCORES}")
 
         for ic in self.problem.system.ics:
             limit = 5  # int(MAX_VCORES // ic.cores)
-            print(f"TODO: limit for {ic.name}: {limit}")
+            logging.warning(f"TODO: limit for {ic.name}: {limit}")
             for i in range(limit):
                 new_vm_name = f"{ic.name}-{i}"
                 new_vm = Vm(ic=ic, num=i)
@@ -93,7 +92,7 @@ class ConllooviaAllocator:
                         perf = self.problem.system.perfs[(ic, cc)]
                         self.container_performances[new_container_name] = perf
 
-        print(
+        logging.info(
             f"There are {len(self.vm_names)} X variables and {len(self.container_names)} Z variables"
         )
 
@@ -123,7 +122,7 @@ class ConllooviaAllocator:
                 f"Enough_perf_for_{app}",
             )
 
-        # Core, memoryand IC  restrictions
+        # Core, memory and IC  restrictions
         BIG_M = 1e6  # More than the maximum number of containers in an IC
         for vm_name in self.vm_names:
             containers_for_this_vm = []

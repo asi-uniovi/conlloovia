@@ -25,9 +25,10 @@ class ConllooviaAllocator:
         self.lPproblem = LpProblem("Container_problem", LpMinimize)
 
     def solve(self) -> Solution:
-        self.create_vars()
-        self.create_objective()
-        self.create_restrictions()
+        """Solve the linear programming problem."""
+        self.__create_vars()
+        self.__create_objective()
+        self.__create_restrictions()
 
         self.lPproblem.solve()
 
@@ -65,7 +66,8 @@ class ConllooviaAllocator:
 
         return sol
 
-    def create_vars(self):
+    def __create_vars(self):
+        """Creates the variables for the linear programming algorithm."""
         MAX_CONTAINERS = 10
         logging.warning(f"TODO: set a limit to max containers. Now: {MAX_CONTAINERS}")
 
@@ -99,14 +101,14 @@ class ConllooviaAllocator:
         self.x = LpVariable.dicts(name="X", indexs=self.vm_names, cat=LpBinary)
         self.z = LpVariable.dicts(name="Z", indexs=self.container_names, cat=LpBinary)
 
-    def create_objective(self):
-        # Cost function to optimize
+    def __create_objective(self):
+        """Adds the cost function to optimize."""
         self.lPproblem += lpSum(
             self.x[vm] * self.vms[vm].ic.price for vm in self.vm_names
         )
 
-    def create_restrictions(self):
-        # Performance restrictions
+    def __create_restrictions(self):
+        """Adds the performance restrictions."""
         for app in self.problem.system.apps:
             containers_for_this_app = []
             for name in self.container_names:

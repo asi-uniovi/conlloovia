@@ -1,5 +1,10 @@
+"""Main module of the conlloovia package. It defines the class ConllooviaAllocator,
+which receives a conlloovia problem and constructs and solves the corresponding
+linear programming problem using pulp."""
+
+
 import logging
-from typing import List, Dict, Tuple
+from typing import List, Dict
 
 from pulp import LpVariable, lpSum, LpProblem, LpMinimize, LpStatus, value
 from pulp.constants import LpBinary
@@ -17,12 +22,17 @@ class ConllooviaAllocator:
         Args:
             problem: problem to solve"""
         self.problem = problem
+
         self.vm_names: List[str] = []
         self.vms: Dict[str, Vm] = {}
+
         self.container_names: List[str] = []
         self.containers: Dict[str, Container] = {}
         self.container_performances: Dict[str, float] = {}
+
         self.lp_problem = LpProblem("Container_problem", LpMinimize)
+        self.x: LpVariable = LpVariable(name="x")  # Placeholders
+        self.z: LpVariable = LpVariable(name="y")
 
     def solve(self) -> Solution:
         """Solve the linear programming problem."""
@@ -43,7 +53,7 @@ class ConllooviaAllocator:
                 self.vm_names.append(new_vm_name)
                 self.vms[new_vm_name] = new_vm
 
-                for j, cc in enumerate(self.problem.system.ccs):
+                for cc in self.problem.system.ccs:
                     for k in range(cc.limit):
                         new_container_name = f"{ic.name}-{i}-{cc.name}-{k}"
                         self.container_names.append(new_container_name)
@@ -55,7 +65,9 @@ class ConllooviaAllocator:
                         self.container_performances[new_container_name] = perf
 
         logging.info(
-            f"There are {len(self.vm_names)} X variables and {len(self.container_names)} Z variables"
+            "There are %d X variables and %d Z variables",
+            len(self.vm_names),
+            len(self.container_names),
         )
 
         self.x = LpVariable.dicts(name="X", indexs=self.vm_names, cat=LpBinary)
@@ -142,14 +154,14 @@ class ConllooviaAllocator:
 
     def __log_solution(self):
         logging.info("Solution (only variables different to 0):")
-        for i in self.x:
-            if self.x[i].value() > 0:
-                logging.info(f"  X_{i} = {self.x[i].value()}")
+        for x in self.x.values():
+            if x.value() > 0:
+                logging.info("  %s = %i", x, x.value())
         logging.info("")
 
-        for i in self.z:
-            if self.z[i].value() > 0:
-                logging.info(f"  Z_{i} = {self.z[i].value()}")
+        for z in self.z.values():
+            if z.value() > 0:
+                logging.info("  %s = %i", z, z.value())
 
         logging.info("Status: %s", LpStatus[self.lp_problem.status])
         logging.info("Total cost: %f", value(self.lp_problem.objective))

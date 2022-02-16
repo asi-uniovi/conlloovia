@@ -4,7 +4,7 @@ from typing import List, Dict, Tuple
 from pulp import LpVariable, lpSum, LpProblem, LpMinimize, LpStatus, value
 from pulp.constants import LpBinary
 
-from .model import Problem, Allocation, Vm, Container, Solution, Perf
+from .model import Problem, Allocation, Vm, Container, Solution
 
 
 class ConllooviaAllocator:
@@ -21,7 +21,7 @@ class ConllooviaAllocator:
         self.vms: Dict[str, Vm] = {}
         self.container_names: List[str] = []
         self.containers: Dict[str, Container] = {}
-        self.container_performances: Dict[str, Perf] = {}
+        self.container_performances: Dict[str, float] = {}
         self.lPproblem = LpProblem("Container_problem", LpMinimize)
 
     def solve(self) -> Solution:

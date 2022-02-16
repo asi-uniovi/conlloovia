@@ -29,18 +29,10 @@ class ContainerClass(HashableBaseModel):
     app: App
 
 
-# TODO: Remove?
-class Perf(BaseModel):
-    ic: InstanceClass
-    cc: ContainerClass
-    value: float
-
-
 class System(BaseModel):
     apps: List[App]
     ics: List[InstanceClass]
     ccs: List[ContainerClass]
-    # perfs: List[Perf] # TODO
     perfs: Dict[Tuple[InstanceClass, ContainerClass], float]
 
 

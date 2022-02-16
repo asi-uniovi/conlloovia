@@ -39,11 +39,11 @@ class TestSystem1ic1cc(unittest.TestCase):
         ]
 
         ics = [
-            InstanceClass(name="m5.xlarge", price=0.2, cores=2, mem=16),
+            InstanceClass(name="m5.xlarge", price=0.2, cores=2, mem=16, limit=5),
         ]
 
         ccs = [
-            ContainerClass(name="1c2g", cores=1, mem=2, app=apps[0]),
+            ContainerClass(name="1c2g", cores=1, mem=2, app=apps[0], limit=10),
         ]
 
         base_perf = 1
@@ -109,13 +109,13 @@ class TestSystem2ic2cc(unittest.TestCase):
         ]
 
         ics = [
-            InstanceClass(name="m5.large", price=0.2, cores=1, mem=8),
-            InstanceClass(name="m5.xlarge", price=0.4, cores=2, mem=16),
+            InstanceClass(name="m5.large", price=0.2, cores=1, mem=8, limit=5),
+            InstanceClass(name="m5.xlarge", price=0.4, cores=2, mem=16, limit=5),
         ]
 
         ccs = [
-            ContainerClass(name="1c2g", cores=1, mem=2, app=apps[0]),
-            ContainerClass(name="2c2g", cores=2, mem=2, app=apps[0]),
+            ContainerClass(name="1c2g", cores=1, mem=2, app=apps[0], limit=10),
+            ContainerClass(name="2c2g", cores=2, mem=2, app=apps[0], limit=10),
         ]
 
         base_perf = 1
@@ -209,21 +209,21 @@ class Test2apps(unittest.TestCase):
         ]
 
         ics = [
-            InstanceClass(name="m5.large", price=0.2, cores=1, mem=8),
-            InstanceClass(name="m5.xlarge", price=0.4, cores=2, mem=16),
-            InstanceClass(name="m5.2xlarge", price=0.8, cores=4, mem=32),
-            InstanceClass(name="m5.4xlarge", price=1.6, cores=8, mem=64),
+            InstanceClass(name="m5.large", price=0.2, cores=1, mem=8, limit=5),
+            InstanceClass(name="m5.xlarge", price=0.4, cores=2, mem=16, limit=5),
+            InstanceClass(name="m5.2xlarge", price=0.8, cores=4, mem=32, limit=5),
+            InstanceClass(name="m5.4xlarge", price=1.6, cores=8, mem=64, limit=5),
         ]
 
         ccs = [
-            ContainerClass(name="1c2gApp0", cores=1, mem=2, app=apps[0]),
-            ContainerClass(name="2c2gApp0", cores=2, mem=2, app=apps[0]),
-            ContainerClass(name="4c2gApp0", cores=4, mem=2, app=apps[0]),
-            ContainerClass(name="1c2gApp1", cores=1, mem=2, app=apps[1]),
-            ContainerClass(name="2c2gApp1", cores=2, mem=2, app=apps[1]),
-            ContainerClass(name="1c4gApp1", cores=1, mem=4, app=apps[1]),
-            ContainerClass(name="2c4gApp1", cores=2, mem=4, app=apps[1]),
-            ContainerClass(name="1c8gApp1", cores=1, mem=8, app=apps[1]),
+            ContainerClass(name="1c2gApp0", cores=1, mem=2, app=apps[0], limit=10),
+            ContainerClass(name="2c2gApp0", cores=2, mem=2, app=apps[0], limit=10),
+            ContainerClass(name="4c2gApp0", cores=4, mem=2, app=apps[0], limit=10),
+            ContainerClass(name="1c2gApp1", cores=1, mem=2, app=apps[1], limit=10),
+            ContainerClass(name="2c2gApp1", cores=2, mem=2, app=apps[1], limit=10),
+            ContainerClass(name="1c4gApp1", cores=1, mem=4, app=apps[1], limit=10),
+            ContainerClass(name="2c4gApp1", cores=2, mem=4, app=apps[1], limit=10),
+            ContainerClass(name="1c8gApp1", cores=1, mem=8, app=apps[1], limit=10),
         ]
 
         base_perf_app0 = 5

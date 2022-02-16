@@ -36,23 +36,15 @@ class ConllooviaAllocator:
 
     def __create_vars(self):
         """Creates the variables for the linear programming algorithm."""
-        MAX_CONTAINERS = 10
-        logging.warning(f"TODO: set a limit to max containers. Now: {MAX_CONTAINERS}")
-
-        MAX_VCORES = 640
-        logging.warning(f"TODO: MAX_VCORES: {MAX_VCORES}")
-
         for ic in self.problem.system.ics:
-            limit = 5  # int(MAX_VCORES // ic.cores)
-            logging.warning(f"TODO: limit for {ic.name}: {limit}")
-            for i in range(limit):
+            for i in range(ic.limit):
                 new_vm_name = f"{ic.name}-{i}"
                 new_vm = Vm(ic=ic, num=i)
                 self.vm_names.append(new_vm_name)
                 self.vms[new_vm_name] = new_vm
 
                 for j, cc in enumerate(self.problem.system.ccs):
-                    for k in range(MAX_CONTAINERS):
+                    for k in range(cc.limit):
                         new_container_name = f"{ic.name}-{i}-{cc.name}-{k}"
                         self.container_names.append(new_container_name)
                         self.containers[new_container_name] = Container(

@@ -20,6 +20,7 @@ class InstanceClass(HashableBaseModel):
     price: float = 0
     cores: float = 0  # millicores
     mem: float = 0  # GiB
+    limit: int
 
 
 class ContainerClass(HashableBaseModel):
@@ -27,6 +28,7 @@ class ContainerClass(HashableBaseModel):
     cores: float = 0
     mem: float = 0
     app: App
+    limit: int
 
 
 class System(BaseModel):

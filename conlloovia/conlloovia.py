@@ -22,7 +22,7 @@ class ConllooviaAllocator:
         self.container_names: List[str] = []
         self.containers: Dict[str, Container] = {}
         self.container_performances: Dict[str, float] = {}
-        self.lPproblem = LpProblem("Container_problem", LpMinimize)
+        self.lp_problem = LpProblem("Container_problem", LpMinimize)
 
     def solve(self) -> Solution:
         """Solve the linear programming problem."""
@@ -30,7 +30,7 @@ class ConllooviaAllocator:
         self.__create_objective()
         self.__create_restrictions()
 
-        self.lPproblem.solve()
+        self.lp_problem.solve()
 
         return self.__create_solution()
 
@@ -63,7 +63,7 @@ class ConllooviaAllocator:
 
     def __create_objective(self):
         """Adds the cost function to optimize."""
-        self.lPproblem += lpSum(
+        self.lp_problem += lpSum(
             self.x[vm] * self.vms[vm].ic.price for vm in self.vm_names
         )
 
@@ -75,7 +75,7 @@ class ConllooviaAllocator:
                 if self.containers[name].cc.app == app:
                     containers_for_this_app.append(name)
 
-            self.lPproblem += (
+            self.lp_problem += (
                 lpSum(
                     self.z[name] * self.container_performances[name]
                     for name in containers_for_this_app
@@ -92,7 +92,7 @@ class ConllooviaAllocator:
                 if self.containers[container_name].vm == self.vms[vm_name]:
                     containers_for_this_vm.append(container_name)
 
-            self.lPproblem += (
+            self.lp_problem += (
                 lpSum(
                     self.z[container] * self.containers[container].cc.cores
                     for container in containers_for_this_vm
@@ -101,7 +101,7 @@ class ConllooviaAllocator:
                 f"Enough_cores_in_vm_{vm_name}",
             )
 
-            self.lPproblem += (
+            self.lp_problem += (
                 lpSum(
                     self.z[container] * self.containers[container].cc.mem
                     for container in containers_for_this_vm
@@ -110,7 +110,7 @@ class ConllooviaAllocator:
                 f"Enough_mem_in_vm_{vm_name}",
             )
 
-            self.lPproblem += (
+            self.lp_problem += (
                 lpSum(self.z[container] for container in containers_for_this_vm)
                 <= self.x[vm_name] * BIG_M,
                 f"Enough_instances_in_vm_{vm_name}",
@@ -135,7 +135,7 @@ class ConllooviaAllocator:
         )
 
         sol = Solution(
-            problem=self.problem, alloc=alloc, cost=value(self.lPproblem.objective)
+            problem=self.problem, alloc=alloc, cost=value(self.lp_problem.objective)
         )
 
         return sol
@@ -151,5 +151,5 @@ class ConllooviaAllocator:
             if self.z[i].value() > 0:
                 logging.info(f"  Z_{i} = {self.z[i].value()}")
 
-        logging.info("Status: %s", LpStatus[self.lPproblem.status])
-        logging.info("Total cost: %f", value(self.lPproblem.objective))
+        logging.info("Status: %s", LpStatus[self.lp_problem.status])
+        logging.info("Total cost: %f", value(self.lp_problem.objective))

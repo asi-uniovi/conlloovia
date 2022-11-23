@@ -1,71 +1,74 @@
 """Data classes for the container model of conlloovia"""
 
+from dataclasses import dataclass
 from typing import List, Dict, Tuple
-from xmlrpc.client import Boolean
-
-from pydantic import BaseModel
 
 
-class HashableBaseModel(BaseModel):
-    def __hash__(self):  # make hashable BaseModel subclass
-        return hash((type(self),) + tuple(self.__dict__.values()))
-
-
-class App(HashableBaseModel):
+@dataclass(frozen=True)
+class App:
     name: str
 
 
-class InstanceClass(HashableBaseModel):
+@dataclass(frozen=True)
+class InstanceClass:
     name: str
-    price: float = 0
-    cores: float = 0  # millicores
-    mem: float = 0  # GiB
+    price: float
+    cores: float  # millicores
+    mem: float  # GiB
     limit: int
 
 
-class ContainerClass(HashableBaseModel):
+@dataclass(frozen=True)
+class ContainerClass:
     name: str
-    cores: float = 0
-    mem: float = 0
+    cores: float
+    mem: float
     app: App
     limit: int
 
 
-class System(BaseModel):
+@dataclass(frozen=True)
+class System:
     apps: List[App]
     ics: List[InstanceClass]
     ccs: List[ContainerClass]
     perfs: Dict[Tuple[InstanceClass, ContainerClass], float]
 
 
-class Workload(BaseModel):
+@dataclass(frozen=True)
+class Workload:
     value: float
     app: App
     time_unit: str  # “y”, “h”, “m”, or “s”
 
 
-class Problem(BaseModel):
+@dataclass(frozen=True)
+class Problem:
     system: System
     workloads: Dict[App, Workload]
 
 
-class Vm(HashableBaseModel):
+@dataclass(frozen=True)
+class Vm:
     ic: InstanceClass
     num: int
 
 
-class Container(HashableBaseModel):
+@dataclass(frozen=True)
+class Container:
     cc: ContainerClass
     vm: Vm
     num: int
 
 
-class Allocation(BaseModel):
+@dataclass(frozen=True)
+class Allocation:
     vms: Dict[Vm, bool]
     containers: Dict[Container, bool]
 
 
-class Solution(BaseModel):
+@dataclass(frozen=True)
+class Solution:
     problem: Problem
     alloc: Allocation
     cost: float

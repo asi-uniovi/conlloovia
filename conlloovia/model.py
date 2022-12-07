@@ -2,6 +2,20 @@
 
 from dataclasses import dataclass
 from typing import List, Dict, Tuple
+from enum import Enum
+
+
+class Status(Enum):
+    "Possible status of conlloovia solutions"
+    UNSOLVED = 0
+    OPTIMAL = 1
+    INFEASIBLE = 2
+    INTEGER_INFEASIBLE = 3
+    OVERFULL = 4
+    TRIVIAL = 5
+    ABORTED = 6
+    CBC_ERROR = 7
+    UNKNOWN = 8
 
 
 @dataclass(frozen=True)
@@ -72,3 +86,4 @@ class Solution:
     problem: Problem
     alloc: Allocation
     cost: float
+    status: Status

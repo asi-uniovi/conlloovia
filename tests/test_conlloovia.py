@@ -15,6 +15,7 @@ from conlloovia.model import (
     System,
     Workload,
     Problem,
+    Status,
 )
 from conlloovia import cli
 
@@ -65,6 +66,7 @@ class TestSystem1ic1cc(unittest.TestCase):
         alloc = ConllooviaAllocator(problem)
         sol = alloc.solve()
 
+        self.assertEqual(sol.status, Status.OPTIMAL)
         self.assertEqual(sol.cost, 0.2)
         self.assertEqual(sum(sol.alloc.vms.values()), 1)
         self.assertEqual(sum(sol.alloc.containers.values()), 1)
@@ -282,3 +284,41 @@ class Test2apps(unittest.TestCase):
         self.assertAlmostEqual(sol.cost, 0.8)
         self.assertEqual(sum(sol.alloc.vms.values()), 1)
         self.assertEqual(sum(sol.alloc.containers.values()), 4)
+
+
+class TestInfeasible(unittest.TestCase):
+    """Basic infeasible test."""
+
+    def __set_up(self):
+        apps = [
+            App(name="app0"),
+        ]
+
+        ics = [
+            InstanceClass(name="m5.xlarge", price=0.2, cores=2, mem=16, limit=5),
+        ]
+
+        ccs = [
+            ContainerClass(name="1c2g", cores=1, mem=2, app=apps[0], limit=10),
+        ]
+
+        base_perf = 1
+        perfs = {
+            (ics[0], ccs[0]): base_perf,
+        }
+
+        self.system = System(apps=apps, ics=ics, ccs=ccs, perfs=perfs)
+
+    def test_infeasible(self):
+        self.__set_up()
+
+        app0 = self.system.apps[0]
+        workloads = {
+            app0: Workload(value=1000, app=app0, time_unit="s"),
+        }
+        problem = Problem(system=self.system, workloads=workloads)
+
+        alloc = ConllooviaAllocator(problem)
+        sol = alloc.solve()
+
+        self.assertEqual(sol.status, Status.INFEASIBLE)

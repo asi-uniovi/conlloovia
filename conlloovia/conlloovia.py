@@ -6,10 +6,26 @@ linear programming problem using pulp."""
 import logging
 from typing import List, Dict
 
+import pulp
 from pulp import LpVariable, lpSum, LpProblem, LpMinimize, LpStatus, value
 from pulp.constants import LpBinary
 
-from .model import Problem, Allocation, Vm, Container, Solution
+from .model import Problem, Allocation, Vm, Container, Solution, Status
+
+
+def pulp_to_conlloovia_status(pulp_status: int) -> Status:
+    """Receives a PuLP status code and returns a conlloovia Status."""
+    if pulp_status == pulp.LpStatusInfeasible:
+        r = Status.INFEASIBLE
+    elif pulp_status == pulp.LpStatusNotSolved:
+        r = Status.ABORTED
+    elif pulp_status == pulp.LpStatusOptimal:
+        r = Status.OPTIMAL
+    elif pulp_status == pulp.LpStatusUndefined:
+        r = Status.INTEGER_INFEASIBLE
+    else:
+        r = Status.UNKNOWN
+    return r
 
 
 class ConllooviaAllocator:
@@ -77,7 +93,7 @@ class ConllooviaAllocator:
         """Adds the cost function to optimize."""
         self.lp_problem += lpSum(
             self.x[vm] * self.vms[vm].ic.price for vm in self.vm_names
-        )
+        )  # TODO: units
 
     def __create_restrictions(self):
         """Adds the performance restrictions."""
@@ -147,7 +163,10 @@ class ConllooviaAllocator:
         )
 
         sol = Solution(
-            problem=self.problem, alloc=alloc, cost=value(self.lp_problem.objective)
+            problem=self.problem,
+            alloc=alloc,
+            cost=value(self.lp_problem.objective),
+            status=pulp_to_conlloovia_status(self.lp_problem.status),
         )
 
         return sol

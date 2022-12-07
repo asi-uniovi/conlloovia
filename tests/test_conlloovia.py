@@ -140,7 +140,7 @@ class TestSystem2ic2cc(unittest.TestCase):
         sol = alloc.solve()
 
         self.assertAlmostEqual(sol.cost, 1.8)
-        self.assertEqual(sum(sol.alloc.vms.values()), 6)
+        self.assertEqual(sum(sol.alloc.vms.values()), 5)
         self.assertEqual(sum(sol.alloc.containers.values()), 9)
 
         vms_ics0 = [
@@ -148,14 +148,14 @@ class TestSystem2ic2cc(unittest.TestCase):
             for vm in sol.alloc.vms
             if (vm.ic == self.system.ics[0] and sol.alloc.vms[vm])
         ]
-        self.assertEqual(len(vms_ics0), 3)
+        self.assertEqual(len(vms_ics0), 1)
 
         vms_ics1 = [
             vm
             for vm in sol.alloc.vms
             if (vm.ic == self.system.ics[1] and sol.alloc.vms[vm])
         ]
-        self.assertEqual(len(vms_ics1), 3)
+        self.assertEqual(len(vms_ics1), 4)
 
         total_perf = sum(
             self.system.perfs[c.vm.ic, c.cc]

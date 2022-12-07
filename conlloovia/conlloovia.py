@@ -70,8 +70,8 @@ class ConllooviaAllocator:
             len(self.container_names),
         )
 
-        self.x = LpVariable.dicts(name="X", indexs=self.vm_names, cat=LpBinary)
-        self.z = LpVariable.dicts(name="Z", indexs=self.container_names, cat=LpBinary)
+        self.x = LpVariable.dicts(name="X", indices=self.vm_names, cat=LpBinary)
+        self.z = LpVariable.dicts(name="Z", indices=self.container_names, cat=LpBinary)
 
     def __create_objective(self):
         """Adds the cost function to optimize."""

@@ -10,7 +10,7 @@ import pulp
 from pulp import LpVariable, lpSum, LpProblem, LpMinimize, LpStatus, value
 from pulp.constants import LpBinary
 
-from .model import Problem, Allocation, Vm, Container, Solution, Status
+from .model import Problem, Allocation, Vm, Container, Solution, Status, ureg
 
 
 def pulp_to_conlloovia_status(pulp_status: int) -> Status:
@@ -92,8 +92,12 @@ class ConllooviaAllocator:
     def __create_objective(self):
         """Adds the cost function to optimize."""
         self.lp_problem += lpSum(
-            self.x[vm] * self.vms[vm].ic.price for vm in self.vm_names
-        )  # TODO: units
+            self.x[vm]
+            * self.vms[vm]
+            .ic.price.to(ureg.usd / self.problem.sched_time_size)
+            .magnitude
+            for vm in self.vm_names
+        )
 
     def __create_restrictions(self):
         """Adds the performance restrictions."""
@@ -105,10 +109,13 @@ class ConllooviaAllocator:
 
             self.lp_problem += (
                 lpSum(
-                    self.z[name] * self.container_performances[name]
+                    self.z[name]
+                    * self.container_performances[name]
+                    .to(ureg.req / self.problem.sched_time_size)
+                    .magnitude
                     for name in containers_for_this_app
                 )
-                >= self.problem.workloads[app].value,  # TODO: units
+                >= self.problem.workloads[app].num_reqs,
                 f"Enough_perf_for_{app}",
             )
 
@@ -122,19 +129,19 @@ class ConllooviaAllocator:
 
             self.lp_problem += (
                 lpSum(
-                    self.z[container] * self.containers[container].cc.cores
+                    self.z[container] * self.containers[container].cc.cores.magnitude
                     for container in containers_for_this_vm
                 )
-                <= self.vms[vm_name].ic.cores,
+                <= self.vms[vm_name].ic.cores.magnitude,
                 f"Enough_cores_in_vm_{vm_name}",
             )
 
             self.lp_problem += (
                 lpSum(
-                    self.z[container] * self.containers[container].cc.mem
+                    self.z[container] * self.containers[container].cc.mem.magnitude
                     for container in containers_for_this_vm
                 )
-                <= self.vms[vm_name].ic.mem,
+                <= self.vms[vm_name].ic.mem.magnitude,
                 f"Enough_mem_in_vm_{vm_name}",
             )
 
@@ -165,7 +172,7 @@ class ConllooviaAllocator:
         sol = Solution(
             problem=self.problem,
             alloc=alloc,
-            cost=value(self.lp_problem.objective),
+            cost=value(self.lp_problem.objective) * ureg.usd,
             status=pulp_to_conlloovia_status(self.lp_problem.status),
         )
 

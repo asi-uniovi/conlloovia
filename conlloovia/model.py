@@ -4,6 +4,16 @@ from dataclasses import dataclass
 from typing import List, Dict, Tuple
 from enum import Enum
 
+import pint
+
+ureg = pint.UnitRegistry()
+
+# Define new units
+ureg.define("usd = [currency]")
+ureg.define("core = [computation]")
+ureg.define("millicore = 0.001 core")
+ureg.define("req = [requests]")
+
 
 class Status(Enum):
     "Possible status of conlloovia solutions"
@@ -26,19 +36,30 @@ class App:
 @dataclass(frozen=True)
 class InstanceClass:
     name: str
-    price: float
-    cores: float  # millicores
-    mem: float  # GiB
-    limit: int
+    price: pint.Quantity  # [currency]/[time]
+    cores: pint.Quantity  # [computation]
+    mem: pint.Quantity  # dimensionless
+    limit: int  # Max. number of VMs of this instance class
+
+    def __post_init__(self):
+        """Checks dimensions are valid and store them in the standard units."""
+        object.__setattr__(self, "price", self.price.to("usd/hour"))
+        object.__setattr__(self, "cores", self.cores.to("cores"))
+        object.__setattr__(self, "mem", self.mem.to("gibibytes"))
 
 
 @dataclass(frozen=True)
 class ContainerClass:
     name: str
-    cores: float
-    mem: float
+    cores: pint.Quantity  # [computation]
+    mem: pint.Quantity  # dimensionless
     app: App
-    limit: int
+    limit: int  # Max. number of containers of this container class
+
+    def __post_init__(self):
+        """Checks dimensions are valid and store them in the standard units."""
+        object.__setattr__(self, "cores", self.cores.to("cores"))
+        object.__setattr__(self, "mem", self.mem.to("gibibytes"))
 
 
 @dataclass(frozen=True)
@@ -46,20 +67,48 @@ class System:
     apps: List[App]
     ics: List[InstanceClass]
     ccs: List[ContainerClass]
-    perfs: Dict[Tuple[InstanceClass, ContainerClass], float]
+    perfs: Dict[Tuple[InstanceClass, ContainerClass], pint.Quantity]
+
+    def __post_init__(self):
+        """Checks dimensions are valid and store them in the standard units."""
+        new_perfs = {}
+        for key, value in self.perfs.items():
+            new_perfs[key] = value.to("req/hour")
+
+        object.__setattr__(self, "perfs", new_perfs)
 
 
 @dataclass(frozen=True)
 class Workload:
-    value: float
+    num_reqs: float  # [req]
+    time_slot_size: pint.Quantity  # [time]
     app: App
-    time_unit: str  # “y”, “h”, “m”, or “s”
+
+    def __post_init__(self):
+        """Checks dimensions of the time_slot_size are valid."""
+        self.time_slot_size.to(
+            "hour"
+        )  # If the dimensions are wrong, this raises an Exception
 
 
 @dataclass(frozen=True)
 class Problem:
     system: System
     workloads: Dict[App, Workload]
+    sched_time_size: pint.Quantity  # Size of the scheduling window [time]
+
+    def __post_init__(self):
+        """Checks dimensions of the sched_time_size are valid. In addition, it
+        must be the same as the workload time slot size for all workloads."""
+        self.sched_time_size.to(
+            "hour"
+        )  # If the dimensions are wrong, this raises an Exception
+
+        for wl in self.workloads.values():
+            if wl.time_slot_size != self.sched_time_size:
+                raise ValueError(
+                    f"All workloads should have the time slot unit {self.sched_time_size}"
+                )
 
 
 @dataclass(frozen=True)
@@ -85,5 +134,9 @@ class Allocation:
 class Solution:
     problem: Problem
     alloc: Allocation
-    cost: float
+    cost: pint.Quantity  # [currency]
     status: Status
+
+    def __post_init__(self):
+        """Checks dimensions are valid and store them in the standard units."""
+        object.__setattr__(self, "cost", self.cost.to("usd"))

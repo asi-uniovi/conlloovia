@@ -1,9 +1,7 @@
 #!/usr/bin/env python
-import unittest
-
 """Tests for `conlloovia` package."""
 
-import pytest
+import unittest
 
 from click.testing import CliRunner
 
@@ -16,8 +14,12 @@ from conlloovia.model import (
     Workload,
     Problem,
     Status,
+    ureg,
 )
 from conlloovia import cli
+
+# Shorthand for defining units
+Q_ = ureg.Quantity
 
 
 def test_command_line_interface():
@@ -40,14 +42,26 @@ class TestSystem1ic1cc(unittest.TestCase):
         ]
 
         ics = [
-            InstanceClass(name="m5.xlarge", price=0.2, cores=2, mem=16, limit=5),
+            InstanceClass(
+                name="m5.xlarge",
+                price=Q_("0.2 usd/h"),
+                cores=Q_("2 cores"),
+                mem=Q_("16 gibibytes"),
+                limit=5,
+            ),
         ]
 
         ccs = [
-            ContainerClass(name="1c2g", cores=1, mem=2, app=apps[0], limit=10),
+            ContainerClass(
+                name="1c2g",
+                cores=Q_("1 core"),
+                mem=Q_("2 gibibytes"),
+                app=apps[0],
+                limit=10,
+            ),
         ]
 
-        base_perf = 1
+        base_perf = Q_("1 req/s")
         perfs = {
             (ics[0], ccs[0]): base_perf,
         }
@@ -59,15 +73,17 @@ class TestSystem1ic1cc(unittest.TestCase):
         self.__set_up()
 
         app = self.system.apps[0]
-        workload_app = Workload(value=1, app=app, time_unit="s")
+        workload_app = Workload(num_reqs=1, time_slot_size=Q_("s"), app=app)
         workloads = {app: workload_app}
-        problem = Problem(system=self.system, workloads=workloads)
+        problem = Problem(
+            system=self.system, workloads=workloads, sched_time_size=Q_("s")
+        )
 
         alloc = ConllooviaAllocator(problem)
         sol = alloc.solve()
 
         self.assertEqual(sol.status, Status.OPTIMAL)
-        self.assertEqual(sol.cost, 0.2)
+        self.assertEqual(sol.cost, Q_("0.2/3600 usd"))
         self.assertEqual(sum(sol.alloc.vms.values()), 1)
         self.assertEqual(sum(sol.alloc.containers.values()), 1)
 
@@ -76,14 +92,16 @@ class TestSystem1ic1cc(unittest.TestCase):
         self.__set_up()
 
         app = self.system.apps[0]
-        workload_app = Workload(value=2, app=app, time_unit="s")
+        workload_app = Workload(num_reqs=2, time_slot_size=Q_("s"), app=app)
         workloads = {app: workload_app}
-        problem = Problem(system=self.system, workloads=workloads)
+        problem = Problem(
+            system=self.system, workloads=workloads, sched_time_size=Q_("s")
+        )
 
         alloc = ConllooviaAllocator(problem)
         sol = alloc.solve()
 
-        self.assertEqual(sol.cost, 0.2)
+        self.assertEqual(sol.cost, Q_("0.2/3600 usd"))
         self.assertEqual(sum(sol.alloc.vms.values()), 1)
         self.assertEqual(sum(sol.alloc.containers.values()), 2)
 
@@ -92,14 +110,16 @@ class TestSystem1ic1cc(unittest.TestCase):
         self.__set_up()
 
         app = self.system.apps[0]
-        workload_app = Workload(value=4, app=app, time_unit="s")
+        workload_app = Workload(num_reqs=4, time_slot_size=Q_("s"), app=app)
         workloads = {app: workload_app}
-        problem = Problem(system=self.system, workloads=workloads)
+        problem = Problem(
+            system=self.system, workloads=workloads, sched_time_size=Q_("s")
+        )
 
         alloc = ConllooviaAllocator(problem)
         sol = alloc.solve()
 
-        self.assertEqual(sol.cost, 0.4)
+        self.assertEqual(sol.cost, Q_("0.4/3600 usd"))
         self.assertEqual(sum(sol.alloc.vms.values()), 2)
         self.assertEqual(sum(sol.alloc.containers.values()), 4)
 
@@ -111,16 +131,40 @@ class TestSystem2ic2cc(unittest.TestCase):
         ]
 
         ics = [
-            InstanceClass(name="m5.large", price=0.2, cores=1, mem=8, limit=5),
-            InstanceClass(name="m5.xlarge", price=0.4, cores=2, mem=16, limit=5),
+            InstanceClass(
+                name="m5.large",
+                price=Q_("0.2 usd/hour"),
+                cores=Q_("1 cores"),
+                mem=Q_("8 gibibytes"),
+                limit=5,
+            ),
+            InstanceClass(
+                name="m5.xlarge",
+                price=Q_("0.4 usd/hour"),
+                cores=Q_("2 cores"),
+                mem=Q_("16 gibibytes"),
+                limit=5,
+            ),
         ]
 
         ccs = [
-            ContainerClass(name="1c2g", cores=1, mem=2, app=apps[0], limit=10),
-            ContainerClass(name="2c2g", cores=2, mem=2, app=apps[0], limit=10),
+            ContainerClass(
+                name="1c2g",
+                cores=Q_("1 cores"),
+                mem=Q_("2 gibibytes"),
+                app=apps[0],
+                limit=10,
+            ),
+            ContainerClass(
+                name="2c2g",
+                cores=Q_("2 cores"),
+                mem=Q_("2 gibibytes"),
+                app=apps[0],
+                limit=10,
+            ),
         ]
 
-        base_perf = 1
+        base_perf = Q_("1 req/s")
         perfs = {
             (ics[0], ccs[0]): base_perf,
             (ics[0], ccs[1]): 1.5 * base_perf,
@@ -134,16 +178,18 @@ class TestSystem2ic2cc(unittest.TestCase):
         self.__set_up()
 
         app = self.system.apps[0]
-        workload = Workload(value=10, app=app, time_unit="s")
+        workload = Workload(num_reqs=10, time_slot_size=Q_("s"), app=app)
         workloads = {app: workload}
-        problem = Problem(system=self.system, workloads=workloads)
+        problem = Problem(
+            system=self.system, workloads=workloads, sched_time_size=Q_("s")
+        )
 
         alloc = ConllooviaAllocator(problem)
         sol = alloc.solve()
 
-        self.assertAlmostEqual(sol.cost, 1.8)
+        self.assertAlmostEqual(sol.cost, Q_("1.8/3600 usd"))
         self.assertEqual(sum(sol.alloc.vms.values()), 5)
-        self.assertEqual(sum(sol.alloc.containers.values()), 9)
+        self.assertEqual(sum(sol.alloc.containers.values()), 8)
 
         vms_ics0 = [
             vm
@@ -164,20 +210,22 @@ class TestSystem2ic2cc(unittest.TestCase):
             for c in sol.alloc.containers
             if sol.alloc.containers[c]
         )
-        self.assertLessEqual(workload.value, total_perf)
+        self.assertLessEqual(workload.num_reqs, total_perf.to(Q_("req/s")).magnitude)
 
     def test_perf5(self):
         self.__set_up()
 
         app = self.system.apps[0]
-        workload = Workload(value=5, app=app, time_unit="s")
+        workload = Workload(num_reqs=5, time_slot_size=Q_("s"), app=app)
         workloads = {app: workload}
-        problem = Problem(system=self.system, workloads=workloads)
+        problem = Problem(
+            system=self.system, workloads=workloads, sched_time_size=Q_("s")
+        )
 
         alloc = ConllooviaAllocator(problem)
         sol = alloc.solve()
 
-        self.assertAlmostEqual(sol.cost, 1)
+        self.assertAlmostEqual(sol.cost, Q_("1/3600 usd"))
         self.assertEqual(sum(sol.alloc.vms.values()), 3)
         self.assertEqual(sum(sol.alloc.containers.values()), 4)
 
@@ -200,7 +248,7 @@ class TestSystem2ic2cc(unittest.TestCase):
             for c in sol.alloc.containers
             if sol.alloc.containers[c]
         )
-        self.assertLessEqual(workload.value, total_perf)
+        self.assertLessEqual(workload.num_reqs, total_perf.to(Q_("req/s")).magnitude)
 
 
 class Test2apps(unittest.TestCase):
@@ -211,25 +259,97 @@ class Test2apps(unittest.TestCase):
         ]
 
         ics = [
-            InstanceClass(name="m5.large", price=0.2, cores=1, mem=8, limit=5),
-            InstanceClass(name="m5.xlarge", price=0.4, cores=2, mem=16, limit=5),
-            InstanceClass(name="m5.2xlarge", price=0.8, cores=4, mem=32, limit=5),
-            InstanceClass(name="m5.4xlarge", price=1.6, cores=8, mem=64, limit=5),
+            InstanceClass(
+                name="m5.large",
+                price=Q_("0.2 usd/hour"),
+                cores=Q_("1 cores"),
+                mem=Q_("8 gibibytes"),
+                limit=5,
+            ),
+            InstanceClass(
+                name="m5.xlarge",
+                price=Q_("0.4 usd/hour"),
+                cores=Q_("2 cores"),
+                mem=Q_("16 gibibytes"),
+                limit=5,
+            ),
+            InstanceClass(
+                name="m5.2xlarge",
+                price=Q_("0.8 usd/hour"),
+                cores=Q_("4 cores"),
+                mem=Q_("32 gibibytes"),
+                limit=5,
+            ),
+            InstanceClass(
+                name="m5.4xlarge",
+                price=Q_("1.6 usd/hour"),
+                cores=Q_("8 cores"),
+                mem=Q_("64 gibibytes"),
+                limit=5,
+            ),
         ]
 
         ccs = [
-            ContainerClass(name="1c2gApp0", cores=1, mem=2, app=apps[0], limit=10),
-            ContainerClass(name="2c2gApp0", cores=2, mem=2, app=apps[0], limit=10),
-            ContainerClass(name="4c2gApp0", cores=4, mem=2, app=apps[0], limit=10),
-            ContainerClass(name="1c2gApp1", cores=1, mem=2, app=apps[1], limit=10),
-            ContainerClass(name="2c2gApp1", cores=2, mem=2, app=apps[1], limit=10),
-            ContainerClass(name="1c4gApp1", cores=1, mem=4, app=apps[1], limit=10),
-            ContainerClass(name="2c4gApp1", cores=2, mem=4, app=apps[1], limit=10),
-            ContainerClass(name="1c8gApp1", cores=1, mem=8, app=apps[1], limit=10),
+            ContainerClass(
+                name="1c2gApp0",
+                cores=Q_("1 cores"),
+                mem=Q_("2 gibibytes"),
+                app=apps[0],
+                limit=10,
+            ),
+            ContainerClass(
+                name="2c2gApp0",
+                cores=Q_("2 cores"),
+                mem=Q_("2 gibibytes"),
+                app=apps[0],
+                limit=10,
+            ),
+            ContainerClass(
+                name="4c2gApp0",
+                cores=Q_("4 cores"),
+                mem=Q_("2 gibibytes"),
+                app=apps[0],
+                limit=10,
+            ),
+            ContainerClass(
+                name="1c2gApp1",
+                cores=Q_("1 cores"),
+                mem=Q_("2 gibibytes"),
+                app=apps[1],
+                limit=10,
+            ),
+            ContainerClass(
+                name="2c2gApp1",
+                cores=Q_("2 cores"),
+                mem=Q_("2 gibibytes"),
+                app=apps[1],
+                limit=10,
+            ),
+            ContainerClass(
+                name="1c4gApp1",
+                cores=Q_("1 cores"),
+                mem=Q_("4 gibibytes"),
+                app=apps[1],
+                limit=10,
+            ),
+            ContainerClass(
+                name="2c4gApp1",
+                cores=Q_("2 cores"),
+                mem=Q_("4 gibibytes"),
+                app=apps[1],
+                limit=10,
+            ),
+            ContainerClass(
+                name="1c8gApp1",
+                cores=Q_("1 cores"),
+                mem=Q_("8 gibibytes"),
+                app=apps[1],
+                limit=10,
+            ),
         ]
 
-        base_perf_app0 = 5
-        base_perf_app1 = 4
+        base_perf_app0 = Q_("5 req/s")
+        base_perf_app1 = Q_("4 req/s")
         perfs = {
             (ics[0], ccs[0]): base_perf_app0,
             (ics[0], ccs[1]): 1.2 * base_perf_app0,
@@ -273,15 +393,17 @@ class Test2apps(unittest.TestCase):
         app0 = self.system.apps[0]
         app1 = self.system.apps[1]
         workloads = {
-            app0: Workload(value=10, app=app0, time_unit="s"),
-            app1: Workload(value=20, app=app0, time_unit="s"),
+            app0: Workload(num_reqs=10, time_slot_size=Q_("s"), app=app0),
+            app1: Workload(num_reqs=20, time_slot_size=Q_("s"), app=app1),
         }
-        problem = Problem(system=self.system, workloads=workloads)
+        problem = Problem(
+            system=self.system, workloads=workloads, sched_time_size=Q_("s")
+        )
 
         alloc = ConllooviaAllocator(problem)
         sol = alloc.solve()
 
-        self.assertAlmostEqual(sol.cost, 0.8)
+        self.assertAlmostEqual(sol.cost, Q_("0.8/3600 usd"))
         self.assertEqual(sum(sol.alloc.vms.values()), 1)
         self.assertEqual(sum(sol.alloc.containers.values()), 4)
 
@@ -295,14 +417,26 @@ class TestInfeasible(unittest.TestCase):
         ]
 
         ics = [
-            InstanceClass(name="m5.xlarge", price=0.2, cores=2, mem=16, limit=5),
+            InstanceClass(
+                name="m5.xlarge",
+                price=Q_("0.2 usd/hour"),
+                cores=Q_("2 cores"),
+                mem=Q_("16 gibibytes"),
+                limit=5,
+            ),
         ]
 
         ccs = [
-            ContainerClass(name="1c2g", cores=1, mem=2, app=apps[0], limit=10),
+            ContainerClass(
+                name="1c2g",
+                cores=Q_("1 cores"),
+                mem=Q_("2 gibibytes"),
+                app=apps[0],
+                limit=10,
+            ),
         ]
 
-        base_perf = 1
+        base_perf = Q_("1 req/s")
         perfs = {
             (ics[0], ccs[0]): base_perf,
         }
@@ -314,9 +448,11 @@ class TestInfeasible(unittest.TestCase):
 
         app0 = self.system.apps[0]
         workloads = {
-            app0: Workload(value=1000, app=app0, time_unit="s"),
+            app0: Workload(num_reqs=1000, time_slot_size=Q_("s"), app=app0),
         }
-        problem = Problem(system=self.system, workloads=workloads)
+        problem = Problem(
+            system=self.system, workloads=workloads, sched_time_size=Q_("s")
+        )
 
         alloc = ConllooviaAllocator(problem)
         sol = alloc.solve()

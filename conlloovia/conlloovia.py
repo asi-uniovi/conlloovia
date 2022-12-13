@@ -230,16 +230,25 @@ class ConllooviaAllocator:
             containers=container_alloc,
         )
 
+        if solving_stats.status == Status.OPTIMAL:
+            cost = value(self.lp_problem.objective) * ureg.usd
+        else:
+            cost = ureg.Quantity("0 usd")
+
         sol = Solution(
             problem=self.problem,
             alloc=alloc,
-            cost=value(self.lp_problem.objective) * ureg.usd,
+            cost=cost,
             solving_stats=solving_stats,
         )
 
         return sol
 
     def __log_solution(self, solving_stats: SolvingStats):
+        if solving_stats.status != Status.OPTIMAL:
+            logging.info("No optimal solution. Solving stats: %s", solving_stats)
+            return
+
         logging.info("Solution (only variables different to 0):")
         for x in self.x.values():
             if x.value() > 0:

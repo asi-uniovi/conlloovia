@@ -4,6 +4,7 @@
 import unittest
 
 from click.testing import CliRunner
+from pulp import COIN
 
 from conlloovia.conlloovia import ConllooviaAllocator
 from conlloovia.model import (
@@ -69,7 +70,7 @@ class TestSystem1ic1cc(unittest.TestCase):
         self.system = System(apps=apps, ics=ics, ccs=ccs, perfs=perfs)
 
     def test_only_one(self):
-        """Tests that only one VM and container is required"""
+        """Tests that only one VM and container is required."""
         self.__set_up()
 
         app = self.system.apps[0]
@@ -82,7 +83,49 @@ class TestSystem1ic1cc(unittest.TestCase):
         alloc = ConllooviaAllocator(problem)
         sol = alloc.solve()
 
-        self.assertEqual(sol.status, Status.OPTIMAL)
+        self.assertEqual(sol.solving_stats.status, Status.OPTIMAL)
+        self.assertEqual(sol.cost, Q_("0.2/3600 usd"))
+        self.assertEqual(sum(sol.alloc.vms.values()), 1)
+        self.assertEqual(sum(sol.alloc.containers.values()), 1)
+
+    def test_only_one_with_empty_solver(self):
+        """Tests that only one VM and container is required, using a solver with
+        no options."""
+        self.__set_up()
+
+        app = self.system.apps[0]
+        workload_app = Workload(num_reqs=1, time_slot_size=Q_("s"), app=app)
+        workloads = {app: workload_app}
+        problem = Problem(
+            system=self.system, workloads=workloads, sched_time_size=Q_("s")
+        )
+
+        alloc = ConllooviaAllocator(problem)
+        solver = COIN()
+        sol = alloc.solve(solver)
+
+        self.assertEqual(sol.solving_stats.status, Status.OPTIMAL)
+        self.assertEqual(sol.cost, Q_("0.2/3600 usd"))
+        self.assertEqual(sum(sol.alloc.vms.values()), 1)
+        self.assertEqual(sum(sol.alloc.containers.values()), 1)
+
+    def test_only_one_with_solver_options(self):
+        """Tests that only one VM and container is required, using a solver with
+        options."""
+        self.__set_up()
+
+        app = self.system.apps[0]
+        workload_app = Workload(num_reqs=1, time_slot_size=Q_("s"), app=app)
+        workloads = {app: workload_app}
+        problem = Problem(
+            system=self.system, workloads=workloads, sched_time_size=Q_("s")
+        )
+
+        alloc = ConllooviaAllocator(problem)
+        solver = COIN(timeLimit=10, gapRel=0.01, threads=8)
+        sol = alloc.solve(solver)
+
+        self.assertEqual(sol.solving_stats.status, Status.OPTIMAL)
         self.assertEqual(sol.cost, Q_("0.2/3600 usd"))
         self.assertEqual(sum(sol.alloc.vms.values()), 1)
         self.assertEqual(sum(sol.alloc.containers.values()), 1)
@@ -457,4 +500,4 @@ class TestInfeasible(unittest.TestCase):
         alloc = ConllooviaAllocator(problem)
         sol = alloc.solve()
 
-        self.assertEqual(sol.status, Status.INFEASIBLE)
+        self.assertEqual(sol.solving_stats.status, Status.INFEASIBLE)

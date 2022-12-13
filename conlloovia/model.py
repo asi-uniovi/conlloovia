@@ -131,11 +131,21 @@ class Allocation:
 
 
 @dataclass(frozen=True)
+class SolvingStats:
+    frac_gap: float
+    max_seconds: float
+    lower_bound: float
+    creation_time: float
+    solving_time: float
+    status: Status
+
+
+@dataclass(frozen=True)
 class Solution:
     problem: Problem
     alloc: Allocation
     cost: pint.Quantity  # [currency]
-    status: Status
+    solving_stats: SolvingStats
 
     def __post_init__(self):
         """Checks dimensions are valid and store them in the standard units."""

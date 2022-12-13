@@ -2,15 +2,24 @@
 which receives a conlloovia problem and constructs and solves the corresponding
 linear programming problem using pulp."""
 
-
+import time
 import logging
-from typing import List, Dict
+from typing import List, Dict, Any
 
-import pulp
-from pulp import LpVariable, lpSum, LpProblem, LpMinimize, LpStatus, value
-from pulp.constants import LpBinary
+import pulp  # type: ignore
+from pulp import LpVariable, lpSum, LpProblem, LpMinimize, value, PulpSolverError  # type: ignore
+from pulp.constants import LpBinary  # type: ignore
 
-from .model import Problem, Allocation, Vm, Container, Solution, Status, ureg
+from .model import (
+    Problem,
+    Allocation,
+    Vm,
+    Container,
+    Solution,
+    Status,
+    SolvingStats,
+    ureg,
+)
 
 
 def pulp_to_conlloovia_status(pulp_status: int) -> Status:
@@ -50,15 +59,67 @@ class ConllooviaAllocator:
         self.x: LpVariable = LpVariable(name="x")  # Placeholders
         self.z: LpVariable = LpVariable(name="y")
 
-    def solve(self) -> Solution:
-        """Solve the linear programming problem."""
+    def solve(self, solver: Any = None) -> Solution:
+        """Solve the linear programming problem. A solver with options can be
+        passed. For instance:
+
+            from pulp import COIN
+            solver = solver = COIN(timeLimit=10, gapRel=0.01, threads=8)
+
+        """
+        start_creation = time.perf_counter()
         self.__create_vars()
         self.__create_objective()
         self.__create_restrictions()
+        creation_time = time.perf_counter() - start_creation
 
-        self.lp_problem.solve()
+        solving_stats = self.__solve_problem(solver, creation_time)
+        return self.__create_solution(solving_stats)
 
-        return self.__create_solution()
+    def __solve_problem(self, solver, creation_time):
+        status = Status.UNKNOWN
+        lower_bound = None
+
+        start_solving = time.perf_counter()
+        if solver is None:
+            frac_gap = None
+            max_seconds = None
+        else:
+            if "gapRel" in solver.optionsDict:
+                frac_gap = solver.optionsDict["gapRel"]
+            else:
+                frac_gap = None
+            max_seconds = solver.timeLimit
+
+        try:
+            self.lp_problem.solve(solver, use_mps=False)
+        except PulpSolverError as exception:
+            end_solving = time.perf_counter()
+            solving_time = end_solving - start_solving
+            status = Status.CBC_ERROR
+            print(
+                f"Exception PulpSolverError. Time to failure: {solving_time} seconds",
+                exception,
+            )
+        else:
+            # No exceptions
+            end_solving = time.perf_counter()
+            solving_time = time.perf_counter() - start_solving
+            status = pulp_to_conlloovia_status(self.lp_problem.status)
+
+        if status == Status.ABORTED:
+            lower_bound = self.lp_problem.bestBound
+
+        solving_stats = SolvingStats(
+            frac_gap=frac_gap,
+            max_seconds=max_seconds,
+            lower_bound=lower_bound,
+            creation_time=creation_time,
+            solving_time=solving_time,
+            status=status,
+        )
+
+        return solving_stats
 
     def __create_vars(self):
         """Creates the variables for the linear programming algorithm."""
@@ -151,8 +212,8 @@ class ConllooviaAllocator:
                 f"Enough_instances_in_vm_{vm_name}",
             )
 
-    def __create_solution(self):
-        self.__log_solution()
+    def __create_solution(self, solving_stats: SolvingStats):
+        self.__log_solution(solving_stats)
 
         vm_alloc = {}
         for vm_name in self.vm_names:
@@ -173,12 +234,12 @@ class ConllooviaAllocator:
             problem=self.problem,
             alloc=alloc,
             cost=value(self.lp_problem.objective) * ureg.usd,
-            status=pulp_to_conlloovia_status(self.lp_problem.status),
+            solving_stats=solving_stats,
         )
 
         return sol
 
-    def __log_solution(self):
+    def __log_solution(self, solving_stats: SolvingStats):
         logging.info("Solution (only variables different to 0):")
         for x in self.x.values():
             if x.value() > 0:
@@ -189,5 +250,5 @@ class ConllooviaAllocator:
             if z.value() > 0:
                 logging.info("  %s = %i", z, z.value())
 
-        logging.info("Status: %s", LpStatus[self.lp_problem.status])
         logging.info("Total cost: %f", value(self.lp_problem.objective))
+        logging.info("Solving stats: %s", solving_stats)

@@ -12,6 +12,7 @@ from pulp.constants import LpBinary  # type: ignore
 
 from .model import (
     Problem,
+    InstanceClass,
     Allocation,
     Vm,
     Container,
@@ -150,15 +151,21 @@ class ConllooviaAllocator:
         self.x = LpVariable.dicts(name="X", indices=self.vm_names, cat=LpBinary)
         self.z = LpVariable.dicts(name="Z", indices=self.container_names, cat=LpBinary)
 
+    def __price_ic_window(self, ic: InstanceClass) -> float:
+        """Returns the cost of the Instance Class in the scheduling window."""
+        return (ic.price * self.problem.sched_time_size).to_reduced_units().magnitude
+
     def __create_objective(self):
         """Adds the cost function to optimize."""
         self.lp_problem += lpSum(
-            self.x[vm]
-            * self.vms[vm]
-            .ic.price.to(ureg.usd / self.problem.sched_time_size)
-            .magnitude
-            for vm in self.vm_names
+            self.x[vm] * self.__price_ic_window(self.vms[vm].ic) for vm in self.vm_names
         )
+
+    def __perf_in_window(self, name: str) -> float:
+        """Returns the number of requests that a container gives in the scheduling window.
+        It receives the name of the variable."""
+        perf_window = self.container_performances[name] * self.problem.sched_time_size
+        return perf_window.to_reduced_units().magnitude
 
     def __create_restrictions(self):
         """Adds the performance restrictions."""
@@ -170,10 +177,7 @@ class ConllooviaAllocator:
 
             self.lp_problem += (
                 lpSum(
-                    self.z[name]
-                    * self.container_performances[name]
-                    .to(ureg.req / self.problem.sched_time_size)
-                    .magnitude
+                    self.z[name] * self.__perf_in_window(name)
                     for name in containers_for_this_app
                 )
                 >= self.problem.workloads[app].num_reqs,

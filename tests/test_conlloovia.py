@@ -4,7 +4,7 @@
 import unittest
 
 from click.testing import CliRunner
-from pulp import COIN
+from pulp import COIN  # type: ignore
 
 from conlloovia.conlloovia import ConllooviaAllocator
 from conlloovia.model import (
@@ -127,6 +127,27 @@ class TestSystem1ic1cc(unittest.TestCase):
 
         self.assertEqual(sol.solving_stats.status, Status.OPTIMAL)
         self.assertEqual(sol.cost, Q_("0.2/3600 usd"))
+        self.assertEqual(sum(sol.alloc.vms.values()), 1)
+        self.assertEqual(sum(sol.alloc.containers.values()), 1)
+
+    def test_only_one_with_5s_window(self):
+        """Tests that only one VM and container is required, using 5 seconds
+        window."""
+        self.__set_up()
+
+        app = self.system.apps[0]
+        workload_app = Workload(num_reqs=1, time_slot_size=Q_("5s"), app=app)
+        workloads = {app: workload_app}
+        problem = Problem(
+            system=self.system, workloads=workloads, sched_time_size=Q_("5s")
+        )
+
+        alloc = ConllooviaAllocator(problem)
+        sol = alloc.solve()
+
+        print(alloc.lp_problem)
+        self.assertEqual(sol.solving_stats.status, Status.OPTIMAL)
+        self.assertEqual(sol.cost, Q_("(0.2/3600)*5 usd"))
         self.assertEqual(sum(sol.alloc.vms.values()), 1)
         self.assertEqual(sum(sol.alloc.containers.values()), 1)
 

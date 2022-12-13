@@ -23,15 +23,18 @@ from .model import (
 )
 
 
-def pulp_to_conlloovia_status(pulp_status: int) -> Status:
+def pulp_to_conlloovia_status(pulp_problem_status: int, pulp_solution_status) -> Status:
     """Receives a PuLP status code and returns a conlloovia Status."""
-    if pulp_status == pulp.LpStatusInfeasible:
+    if pulp_problem_status == pulp.LpStatusInfeasible:
         r = Status.INFEASIBLE
-    elif pulp_status == pulp.LpStatusNotSolved:
+    elif pulp_problem_status == pulp.LpStatusNotSolved:
         r = Status.ABORTED
-    elif pulp_status == pulp.LpStatusOptimal:
-        r = Status.OPTIMAL
-    elif pulp_status == pulp.LpStatusUndefined:
+    elif pulp_problem_status == pulp.LpStatusOptimal:
+        if pulp_solution_status == pulp.LpSolutionOptimal:
+            r = Status.OPTIMAL
+        else:
+            r = Status.INTEGER_FEASIBLE
+    elif pulp_problem_status == pulp.LpStatusUndefined:
         r = Status.INTEGER_INFEASIBLE
     else:
         r = Status.UNKNOWN
@@ -106,7 +109,9 @@ class ConllooviaAllocator:
             # No exceptions
             end_solving = time.perf_counter()
             solving_time = time.perf_counter() - start_solving
-            status = pulp_to_conlloovia_status(self.lp_problem.status)
+            status = pulp_to_conlloovia_status(
+                self.lp_problem.status, self.lp_problem.sol_status
+            )
 
         if status == Status.ABORTED:
             lower_bound = self.lp_problem.bestBound
@@ -181,7 +186,7 @@ class ConllooviaAllocator:
                     for name in containers_for_this_app
                 )
                 >= self.problem.workloads[app].num_reqs,
-                f"Enough_perf_for_{app}",
+                f"Enough_perf_for_{app.name}",
             )
 
         # Core, memory and IC  restrictions
@@ -234,7 +239,7 @@ class ConllooviaAllocator:
             containers=container_alloc,
         )
 
-        if solving_stats.status == Status.OPTIMAL:
+        if solving_stats.status in [Status.OPTIMAL, Status.INTEGER_FEASIBLE]:
             cost = value(self.lp_problem.objective) * ureg.usd
         else:
             cost = ureg.Quantity("0 usd")
@@ -249,8 +254,8 @@ class ConllooviaAllocator:
         return sol
 
     def __log_solution(self, solving_stats: SolvingStats):
-        if solving_stats.status != Status.OPTIMAL:
-            logging.info("No optimal solution. Solving stats: %s", solving_stats)
+        if solving_stats.status not in [Status.OPTIMAL, Status.INTEGER_FEASIBLE]:
+            logging.info("No feasible solution. Solving stats: %s", solving_stats)
             return
 
         logging.info("Solution (only variables different to 0):")

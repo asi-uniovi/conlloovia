@@ -1,7 +1,7 @@
 """Data classes for the container model of conlloovia"""
 
 from dataclasses import dataclass
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 from enum import Enum
 
 import pint
@@ -132,9 +132,9 @@ class Allocation:
 
 @dataclass(frozen=True)
 class SolvingStats:
-    frac_gap: float
-    max_seconds: float
-    lower_bound: float
+    frac_gap: Optional[float]
+    max_seconds: Optional[float]
+    lower_bound: Optional[float]
     creation_time: float
     solving_time: float
     status: Status

@@ -76,7 +76,7 @@ class ConllooviaAllocator:
         solving_stats = self.__solve_problem(solver, creation_time)
         return self.__create_solution(solving_stats)
 
-    def __solve_problem(self, solver, creation_time):
+    def __solve_problem(self, solver: Any, creation_time: float) -> SolvingStats:
         status = Status.UNKNOWN
         lower_bound = None
 

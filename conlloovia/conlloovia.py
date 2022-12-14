@@ -2,12 +2,25 @@
 which receives a conlloovia problem and constructs and solves the corresponding
 linear programming problem using pulp."""
 
+import os
 import time
 import logging
 from typing import List, Dict, Any
 
 import pulp  # type: ignore
-from pulp import LpVariable, lpSum, LpProblem, LpMinimize, value, PulpSolverError  # type: ignore
+
+# type: ignore
+from pulp import (
+    LpVariable,
+    lpSum,
+    LpProblem,
+    LpMinimize,
+    PulpSolverError,
+    COIN_CMD,
+    log,
+    subprocess,
+    devnull,
+)
 from pulp.constants import LpBinary  # type: ignore
 
 from .model import (
@@ -101,6 +114,7 @@ class ConllooviaAllocator:
             end_solving = time.perf_counter()
             solving_time = end_solving - start_solving
             status = Status.CBC_ERROR
+
             print(
                 f"Exception PulpSolverError. Time to failure: {solving_time} seconds",
                 exception,
@@ -113,7 +127,7 @@ class ConllooviaAllocator:
                 self.lp_problem.status, self.lp_problem.sol_status
             )
 
-        if status == Status.ABORTED:
+        if status == Status.INTEGER_FEASIBLE:
             lower_bound = self.lp_problem.bestBound
 
         solving_stats = SolvingStats(
@@ -240,7 +254,7 @@ class ConllooviaAllocator:
         )
 
         if solving_stats.status in [Status.OPTIMAL, Status.INTEGER_FEASIBLE]:
-            cost = value(self.lp_problem.objective) * ureg.usd
+            cost = pulp.value(self.lp_problem.objective) * ureg.usd
         else:
             cost = ureg.Quantity("0 usd")
 
@@ -268,5 +282,125 @@ class ConllooviaAllocator:
             if z.value() > 0:
                 logging.info("  %s = %i", z, z.value())
 
-        logging.info("Total cost: %f", value(self.lp_problem.objective))
+        logging.info("Total cost: %f", pulp.value(self.lp_problem.objective))
         logging.info("Solving stats: %s", solving_stats)
+
+
+# pylint: disable = E, W, R, C
+def _solve_CBC_patched(self, lp, use_mps=True):
+    """Solve a MIP problem using CBC patched from original PuLP function
+    to save a log with cbc's output and take from it the best bound."""
+
+    def take_best_bound_from_log(filename, msg: bool):
+        ret = None
+        try:
+            with open(filename, "r", encoding="utf8") as f:
+                for l in f:
+                    if msg:
+                        print(l, end="")
+                    if l.startswith("Lower bound:"):
+                        ret = float(l.split(":")[-1])
+        except:
+            pass
+        return ret
+
+    if not self.executable(self.path):
+        raise PulpSolverError(
+            "Pulp: cannot execute %s cwd: %s" % (self.path, os.getcwd())
+        )
+    tmpLp, tmpMps, tmpSol, tmpMst = self.create_tmp_files(
+        lp.name, "lp", "mps", "sol", "mst"
+    )
+    if use_mps:
+        vs, variablesNames, constraintsNames, _ = lp.writeMPS(tmpMps, rename=1)
+        cmds = " " + tmpMps + " "
+        if lp.sense == constants.LpMaximize:
+            cmds += "max "
+    else:
+        vs = lp.writeLP(tmpLp)
+        # In the Lp we do not create new variable or constraint names:
+        variablesNames = dict((v.name, v.name) for v in vs)
+        constraintsNames = dict((c, c) for c in lp.constraints)
+        cmds = " " + tmpLp + " "
+    if self.optionsDict.get("warmStart", False):
+        self.writesol(tmpMst, lp, vs, variablesNames, constraintsNames)
+        cmds += "mips {} ".format(tmpMst)
+    if self.timeLimit is not None:
+        cmds += "sec %s " % self.timeLimit
+    options = self.options + self.getOptions()
+    for option in options:
+        cmds += option + " "
+    if self.mip:
+        cmds += "branch "
+    else:
+        cmds += "initialSolve "
+    cmds += "printingOptions all "
+    cmds += "solution " + tmpSol + " "
+    if self.msg:
+        pipe = subprocess.PIPE  # Modified
+    else:
+        pipe = open(os.devnull, "w")
+    logPath = self.optionsDict.get("logPath")
+    if logPath:
+        if self.msg:
+            warnings.warn(
+                "`logPath` argument replaces `msg=1`. The output will be redirected to the log file."
+            )
+        pipe = open(self.optionsDict["logPath"], "w")
+    log.debug(self.path + cmds)
+    args = []
+    args.append(self.path)
+    args.extend(cmds[1:].split())
+    with open(tmpLp + ".log", "w", encoding="utf8") as pipe:
+        print(f"You can check the CBC log at {tmpLp}.log")
+        if not self.msg and operating_system == "win":
+            # Prevent flashing windows if used from a GUI application
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            cbc = subprocess.Popen(
+                args, stdout=pipe, stderr=pipe, stdin=devnull, startupinfo=startupinfo
+            )
+        else:
+            cbc = subprocess.Popen(args, stdout=pipe, stderr=pipe, stdin=devnull)
+
+        # Modified to get the best bound
+        # output, _ = cbc.communicate()
+        # if pipe:
+        #     print("CBC output")
+        #     for line in StringIO(output.decode("utf8")):
+        #         if line.startswith("Lower bound:"):
+        #             lp.bestBound = float(line.split(":")[1].strip())
+
+        #         print(line, end="")
+
+        if cbc.wait() != 0:
+            if pipe:
+                pipe.close()
+            raise PulpSolverError(
+                "Pulp: Error while trying to execute, use msg=True for more details"
+                + self.path
+            )
+        if pipe:
+            pipe.close()
+    if not os.path.exists(tmpSol):
+        raise PulpSolverError("Pulp: Error while executing " + self.path)
+    (
+        status,
+        values,
+        reducedCosts,
+        shadowPrices,
+        slacks,
+        sol_status,
+    ) = self.readsol_MPS(tmpSol, lp, vs, variablesNames, constraintsNames)
+    lp.assignVarsVals(values)
+    lp.assignVarsDj(reducedCosts)
+    lp.assignConsPi(shadowPrices)
+    lp.assignConsSlack(slacks, activity=True)
+    lp.assignStatus(status, sol_status)
+    lp.bestBound = take_best_bound_from_log(tmpLp + ".log", self.msg)
+    self.delete_tmp_files(tmpMps, tmpLp, tmpSol, tmpMst)
+    return status
+
+
+# Monkey patching
+COIN_CMD.solve_CBC = _solve_CBC_patched

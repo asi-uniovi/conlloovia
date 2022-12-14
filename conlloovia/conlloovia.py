@@ -352,7 +352,7 @@ def _solve_CBC_patched(self, lp, use_mps=True):
     args.append(self.path)
     args.extend(cmds[1:].split())
     with open(tmpLp + ".log", "w", encoding="utf8") as pipe:
-        print(f"You can check the CBC log at {tmpLp}.log")
+        print(f"You can check the CBC log at {tmpLp}.log", flush=True)
         if not self.msg and operating_system == "win":
             # Prevent flashing windows if used from a GUI application
             startupinfo = subprocess.STARTUPINFO()

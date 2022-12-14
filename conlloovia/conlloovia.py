@@ -81,7 +81,7 @@ class ConllooviaAllocator:
         passed. For instance:
 
             from pulp import COIN
-            solver = solver = COIN(timeLimit=10, gapRel=0.01, threads=8)
+            solver = COIN(timeLimit=10, gapRel=0.01, threads=8)
 
         """
         start_creation = time.perf_counter()

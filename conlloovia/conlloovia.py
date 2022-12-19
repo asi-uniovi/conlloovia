@@ -83,8 +83,8 @@ class ConllooviaAllocator:
         """Solve the linear programming problem. A solver with options can be
         passed. For instance:
 
-            from pulp import COIN
-            solver = COIN(timeLimit=10, gapRel=0.01, threads=8)
+            from pulp import PULP_CBC_CMD
+            solver = PULP_CBC_CMD(timeLimit=10, gapRel=0.01, threads=8)
 
         """
         start_creation = time.perf_counter()

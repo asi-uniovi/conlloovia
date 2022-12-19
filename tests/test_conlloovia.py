@@ -4,7 +4,7 @@
 import unittest
 
 from click.testing import CliRunner
-from pulp import COIN  # type: ignore
+from pulp import PULP_CBC_CMD  # type: ignore
 
 from conlloovia.conlloovia import ConllooviaAllocator
 from conlloovia.model import (
@@ -101,7 +101,7 @@ class TestSystem1ic1cc(unittest.TestCase):
         )
 
         alloc = ConllooviaAllocator(problem)
-        solver = COIN()
+        solver = PULP_CBC_CMD()
         sol = alloc.solve(solver)
 
         self.assertEqual(sol.solving_stats.status, Status.OPTIMAL)
@@ -122,7 +122,7 @@ class TestSystem1ic1cc(unittest.TestCase):
         )
 
         alloc = ConllooviaAllocator(problem)
-        solver = COIN(timeLimit=10, gapRel=0.01, threads=8)
+        solver = PULP_CBC_CMD(timeLimit=10, gapRel=0.01, threads=8)
         sol = alloc.solve(solver)
 
         self.assertEqual(sol.solving_stats.status, Status.OPTIMAL)

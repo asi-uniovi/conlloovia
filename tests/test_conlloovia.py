@@ -45,7 +45,7 @@ class TestSystem1ic1cc(unittest.TestCase):
         ics = [
             InstanceClass(
                 name="m5.xlarge",
-                price=Q_("0.2 usd/h"),
+                price=Q_("0.2 usd/hour"),
                 cores=Q_("2 cores"),
                 mem=Q_("16 gibibytes"),
                 limit=5,

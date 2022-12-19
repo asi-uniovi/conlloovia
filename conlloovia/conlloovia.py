@@ -36,8 +36,11 @@ from .model import (
 )
 
 
-def pulp_to_conlloovia_status(pulp_problem_status: int, pulp_solution_status) -> Status:
-    """Receives a PuLP status code and returns a conlloovia Status."""
+def pulp_to_conlloovia_status(
+    pulp_problem_status: int, pulp_solution_status: int
+) -> Status:
+    """Receives the PuLP status code for the problem (LpProblem.status) and the
+    solution (LpProblem.sol_status) and returns a conlloovia Status."""
     if pulp_problem_status == pulp.LpStatusInfeasible:
         r = Status.INFEASIBLE
     elif pulp_problem_status == pulp.LpStatusNotSolved:

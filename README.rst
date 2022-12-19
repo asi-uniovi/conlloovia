@@ -6,8 +6,8 @@ conlloovia
 .. image:: https://img.shields.io/pypi/v/conlloovia.svg
         :target: https://pypi.python.org/pypi/conlloovia
 
-.. image:: https://img.shields.io/travis/jentrialgo/conlloovia.svg
-        :target: https://travis-ci.com/jentrialgo/conlloovia
+.. image:: https://github.com/asi-uniovi/conlloovia/actions/workflows/tests.yaml/badge.svg
+        :alt: Testing status
 
 .. image:: https://readthedocs.org/projects/conlloovia/badge/?version=latest
         :target: https://conlloovia.readthedocs.io/en/latest/?version=latest

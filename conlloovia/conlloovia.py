@@ -26,6 +26,7 @@ from pulp.constants import LpBinary  # type: ignore
 from .model import (
     Problem,
     InstanceClass,
+    App,
     Allocation,
     Vm,
     Container,
@@ -74,6 +75,11 @@ class ConllooviaAllocator:
         self.container_names: List[str] = []
         self.containers: Dict[str, Container] = {}
         self.container_performances: Dict[str, float] = {}
+        self.container_names_per_app: Dict[App, list[Container]] = {}
+        self.container_names_per_vm: Dict[Vm, list[Container]] = {}
+
+        for app in self.problem.system.apps:
+            self.container_names_per_app[app] = []
 
         self.lp_problem = LpProblem("Container_problem", LpMinimize)
         self.x: LpVariable = LpVariable(name="x")  # Placeholders
@@ -152,14 +158,16 @@ class ConllooviaAllocator:
                 new_vm = Vm(ic=ic, num=i)
                 self.vm_names.append(new_vm_name)
                 self.vms[new_vm_name] = new_vm
+                self.container_names_per_vm[new_vm] = []
 
                 for cc in self.problem.system.ccs:
                     for k in range(cc.limit):
                         new_container_name = f"{ic.name}-{i}-{cc.name}-{k}"
                         self.container_names.append(new_container_name)
-                        self.containers[new_container_name] = Container(
-                            cc=cc, vm=new_vm, num=k
-                        )
+                        new_container = Container(cc=cc, vm=new_vm, num=k)
+                        self.containers[new_container_name] = new_container
+                        self.container_names_per_app[cc.app].append(new_container_name)
+                        self.container_names_per_vm[new_vm].append(new_container_name)
 
                         perf = self.problem.system.perfs[(ic, cc)]
                         self.container_performances[new_container_name] = perf
@@ -192,15 +200,10 @@ class ConllooviaAllocator:
     def __create_restrictions(self):
         """Adds the performance restrictions."""
         for app in self.problem.system.apps:
-            containers_for_this_app = []
-            for name in self.container_names:
-                if self.containers[name].cc.app == app:
-                    containers_for_this_app.append(name)
-
             self.lp_problem += (
                 lpSum(
                     self.z[name] * self.__perf_in_window(name)
-                    for name in containers_for_this_app
+                    for name in self.container_names_per_app[app]
                 )
                 >= self.problem.workloads[app].num_reqs,
                 f"Enough_perf_for_{app.name}",
@@ -209,10 +212,7 @@ class ConllooviaAllocator:
         # Core, memory and IC  restrictions
         BIG_M = 1e6  # More than the maximum number of containers in an IC
         for vm_name in self.vm_names:
-            containers_for_this_vm = []
-            for container_name in self.container_names:
-                if self.containers[container_name].vm == self.vms[vm_name]:
-                    containers_for_this_vm.append(container_name)
+            containers_for_this_vm = self.container_names_per_vm[self.vms[vm_name]]
 
             self.lp_problem += (
                 lpSum(

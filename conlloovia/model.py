@@ -65,9 +65,9 @@ class ContainerClass:
 
 @dataclass(frozen=True)
 class System:
-    apps: Tuple[App]
-    ics: Tuple[InstanceClass]
-    ccs: Tuple[ContainerClass]
+    apps: Tuple[App, ...]
+    ics: Tuple[InstanceClass, ...]
+    ccs: Tuple[ContainerClass, ...]
     perfs: Dict[Tuple[InstanceClass, ContainerClass], pint.Quantity]
 
     def __post_init__(self):

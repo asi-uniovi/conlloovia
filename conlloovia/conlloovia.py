@@ -161,6 +161,7 @@ class ConllooviaAllocator:
                 self.container_names_per_vm[new_vm] = []
 
                 for cc in self.problem.system.ccs:
+                    perf = self.problem.system.perfs[(ic, cc)]
                     for k in range(cc.limit):
                         new_container_name = f"{ic.name}-{i}-{cc.name}-{k}"
                         self.container_names.append(new_container_name)
@@ -168,8 +169,6 @@ class ConllooviaAllocator:
                         self.containers[new_container_name] = new_container
                         self.container_names_per_app[cc.app].append(new_container_name)
                         self.container_names_per_vm[new_vm].append(new_container_name)
-
-                        perf = self.problem.system.perfs[(ic, cc)]
                         self.container_performances[new_container_name] = perf
 
         logging.info(

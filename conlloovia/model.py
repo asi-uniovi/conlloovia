@@ -1,7 +1,7 @@
 """Data classes for the container model of conlloovia"""
 
 from dataclasses import dataclass
-from typing import List, Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional
 from enum import Enum
 
 import pint
@@ -65,9 +65,9 @@ class ContainerClass:
 
 @dataclass(frozen=True)
 class System:
-    apps: List[App]
-    ics: List[InstanceClass]
-    ccs: List[ContainerClass]
+    apps: Tuple[App]
+    ics: Tuple[InstanceClass]
+    ccs: Tuple[ContainerClass]
     perfs: Dict[Tuple[InstanceClass, ContainerClass], pint.Quantity]
 
     def __post_init__(self):

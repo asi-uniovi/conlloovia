@@ -19,6 +19,9 @@ from pulp import (
     COIN_CMD,
     log,
     subprocess,
+    constants,
+    warnings,
+    operating_system,
     devnull,
 )
 from pulp.constants import LpBinary  # type: ignore

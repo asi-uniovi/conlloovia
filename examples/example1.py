@@ -1,3 +1,4 @@
+"""A simple example of how to use conlloovia."""
 import logging
 
 from conlloovia import (
@@ -13,11 +14,9 @@ from conlloovia import (
 
 Q_ = ureg.Quantity
 
-apps = [
-    App(name="app0"),
-]
+apps = (App(name="app0"),)
 
-ics = [
+ics = (
     InstanceClass(
         name="m5.large",
         price=Q_("0.2 usd/hour"),
@@ -32,16 +31,16 @@ ics = [
         mem=Q_("16 gibibytes"),
         limit=5,
     ),
-]
+)
 
-ccs = [
+ccs = (
     ContainerClass(
         name="1c2g", cores=Q_("1 core"), mem=Q_("2 gibibytes"), app=apps[0], limit=10
     ),
     ContainerClass(
         name="2c2g", cores=Q_("2 core"), mem=Q_("2 gibibytes"), app=apps[0], limit=10
     ),
-]
+)
 
 base_perf = Q_("1 req/s")
 perfs = {

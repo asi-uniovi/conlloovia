@@ -237,7 +237,7 @@ class ConllooviaAllocator:
                 f"Enough_instances_in_vm_{vm_name}",
             )
 
-    def __create_solution(self, solving_stats: SolvingStats):
+    def __create_solution(self, solving_stats: SolvingStats) -> Solution:
         self.__log_solution(solving_stats)
 
         vm_alloc = {}

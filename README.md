@@ -86,6 +86,7 @@ from conlloovia import (
     ConllooviaAllocator,
     ureg,
 )
+from conlloovia.visualization import SolutionPrettyPrinter
 
 Q_ = ureg.Quantity  # Shortcut to create quantities with units, e.g. Q_("1 core")
 ```
@@ -157,7 +158,12 @@ alloc = ConllooviaAllocator(problem)
 sol = alloc.solve()
 ```
 
-You can access the solution with the `sol` variable.
+You can access the solution with the `sol` variable or you can print a summary
+with:
+
+```python
+SolutionPrettyPrinter(sol).print()
+```
 
 Credits
 -------

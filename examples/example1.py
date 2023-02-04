@@ -11,6 +11,7 @@ from conlloovia import (
     ConllooviaAllocator,
     ureg,
 )
+from conlloovia.visualization import SolutionPrettyPrinter
 
 Q_ = ureg.Quantity
 
@@ -61,3 +62,5 @@ logging.basicConfig(level=logging.INFO)
 
 alloc = ConllooviaAllocator(problem)
 sol = alloc.solve()
+
+SolutionPrettyPrinter(sol).print()

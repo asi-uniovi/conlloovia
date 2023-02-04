@@ -31,11 +31,16 @@ class Status(Enum):
 
 @dataclass(frozen=True)
 class App:
+    """Represents an application."""
+
     name: str
 
 
 @dataclass(frozen=True)
 class InstanceClass:
+    """Represents an instance class, i.e., a type of VM in a region, with its
+    price and limits."""
+
     name: str
     price: pint.Quantity  # [currency]/[time]
     cores: pint.Quantity  # [computation]
@@ -51,6 +56,9 @@ class InstanceClass:
 
 @dataclass(frozen=True)
 class ContainerClass:
+    """Represents a container class, i.e., a type of container running an app
+    with some resources."""
+
     name: str
     cores: pint.Quantity  # [computation]
     mem: pint.Quantity  # dimensionless
@@ -65,6 +73,9 @@ class ContainerClass:
 
 @dataclass(frozen=True)
 class System:
+    """Represents a system, i.e., a set of apps, instance classes, container
+    classes, and performance values."""
+
     apps: Tuple[App, ...]
     ics: Tuple[InstanceClass, ...]
     ccs: Tuple[ContainerClass, ...]
@@ -81,6 +92,8 @@ class System:
 
 @dataclass(frozen=True)
 class Workload:
+    """Represents the workload for an app in a time slot."""
+
     num_reqs: float  # [req]
     time_slot_size: pint.Quantity  # [time]
     app: App
@@ -94,6 +107,9 @@ class Workload:
 
 @dataclass(frozen=True)
 class Problem:
+    """Represents a problem, i.e., a system, a set of workloads, and a
+    scheduling time size."""
+
     system: System
     workloads: Dict[App, Workload]
     sched_time_size: pint.Quantity  # Size of the scheduling window [time]
@@ -114,12 +130,18 @@ class Problem:
 
 @dataclass(frozen=True)
 class Vm:
+    """Represents a VM, which has an Instace class and a number to identify this
+    VM in the list of instance classes."""
+
     ic: InstanceClass
     num: int
 
 
 @dataclass(frozen=True)
 class Container:
+    """Represents a container, which has a Container class and a number to
+    identify this container in the list of container classes of this VM."""
+
     cc: ContainerClass
     vm: Vm
     num: int
@@ -127,12 +149,19 @@ class Container:
 
 @dataclass(frozen=True)
 class Allocation:
+    """Represents an allocation. It has a dictionary where the keys are the VMs
+    and the values are true or false, indicating if the VM is allocated or not.
+    It also has a dictionary where the keys are the containers and the values
+    are true or false, indicating if the container is allocated or not."""
+
     vms: Dict[Vm, bool]
     containers: Dict[Container, bool]
 
 
 @dataclass(frozen=True)
 class SolvingStats:
+    """Represents the solving statistics of a solution."""
+
     frac_gap: Optional[float]
     max_seconds: Optional[float]
     lower_bound: Optional[float]
@@ -143,6 +172,9 @@ class SolvingStats:
 
 @dataclass(frozen=True)
 class Solution:
+    """Represents a solution, i.e., an allocation and its cost. It also has
+    the problem that was solve and the solving statistics."""
+
     problem: Problem
     alloc: Allocation
     cost: pint.Quantity  # [currency]

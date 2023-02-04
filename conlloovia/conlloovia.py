@@ -216,6 +216,7 @@ class ConllooviaAllocator:
         for vm_name in self.vm_names:
             containers_for_this_vm = self.container_names_per_vm[self.vms[vm_name]]
 
+            # Core restrictions
             self.lp_problem += (
                 lpSum(
                     self.z[container] * self.containers[container].cc.cores.magnitude
@@ -225,6 +226,7 @@ class ConllooviaAllocator:
                 f"Enough_cores_in_vm_{vm_name}",
             )
 
+            # Memory restrictions
             self.lp_problem += (
                 lpSum(
                     self.z[container] * self.containers[container].cc.mem.magnitude
@@ -234,10 +236,18 @@ class ConllooviaAllocator:
                 f"Enough_mem_in_vm_{vm_name}",
             )
 
+            # IC restrictions
             self.lp_problem += (
                 lpSum(self.z[container] for container in containers_for_this_vm)
                 <= self.x[vm_name] * BIG_M,
                 f"Enough_instances_in_vm_{vm_name}",
+            )
+
+            # Avoid idle VMs
+            self.lp_problem += (
+                self.x[vm_name]
+                <= lpSum(self.z[container] for container in containers_for_this_vm),
+                f"VM_{vm_name}_is_used",
             )
 
     def __create_solution(self, solving_stats: SolvingStats) -> Solution:

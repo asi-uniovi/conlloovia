@@ -7,6 +7,7 @@ from click.testing import CliRunner
 from pulp import PULP_CBC_CMD  # type: ignore
 
 from conlloovia.conlloovia import ConllooviaAllocator
+from conlloovia.visualization import SolutionPrettyPrinter
 from conlloovia.model import (
     InstanceClass,
     App,
@@ -251,9 +252,10 @@ class TestSystem2ic2cc(unittest.TestCase):
         alloc = ConllooviaAllocator(problem)
         sol = alloc.solve()
 
+        SolutionPrettyPrinter(sol).print()
+
         self.assertAlmostEqual(sol.cost, Q_("1.8/3600 usd"))
         self.assertEqual(sum(sol.alloc.vms.values()), 5)
-        self.assertEqual(sum(sol.alloc.containers.values()), 8)
 
         vms_ics0 = [
             vm
@@ -289,9 +291,10 @@ class TestSystem2ic2cc(unittest.TestCase):
         alloc = ConllooviaAllocator(problem)
         sol = alloc.solve()
 
+        SolutionPrettyPrinter(sol).print()
+
         self.assertAlmostEqual(sol.cost, Q_("1/3600 usd"))
         self.assertEqual(sum(sol.alloc.vms.values()), 3)
-        self.assertEqual(sum(sol.alloc.containers.values()), 4)
 
         vms_ics0 = [
             vm

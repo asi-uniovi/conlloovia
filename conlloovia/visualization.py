@@ -93,8 +93,8 @@ class SolutionPrettyPrinter:
         total_num_containers = 0
         total_num_vms = 0
         prev_vm = None
-        for container, is_cc_allocated in alloc.containers.items():
-            if not is_cc_allocated:
+        for container, num_replicas in alloc.containers.items():
+            if num_replicas == 0:
                 continue
 
             total_num_containers += 1
@@ -112,7 +112,7 @@ class SolutionPrettyPrinter:
 
             perf = self.sol.problem.system.perfs[ic, cc]
             perf = (perf * self.sol.problem.sched_time_size).to_reduced_units()
-            table.add_row("", f"{cc.name}[{container.num}]", app.name, str(perf))
+            table.add_row("", f"{cc.name}[{num_replicas}]", app.name, str(perf))
 
         table.add_section()
         table.add_row(

@@ -272,7 +272,7 @@ class TestSystem2ic2cc(unittest.TestCase):
         self.assertEqual(len(vms_ics1), 4)
 
         total_perf = sum(
-            self.system.perfs[c.vm.ic, c.cc]
+            self.system.perfs[c.vm.ic, c.cc] * sol.alloc.containers[c]
             for c in sol.alloc.containers
             if sol.alloc.containers[c]
         )
@@ -311,7 +311,7 @@ class TestSystem2ic2cc(unittest.TestCase):
         self.assertEqual(len(vms_ics1), 2)
 
         total_perf = sum(
-            self.system.perfs[c.vm.ic, c.cc]
+            self.system.perfs[c.vm.ic, c.cc] * sol.alloc.containers[c]
             for c in sol.alloc.containers
             if sol.alloc.containers[c]
         )

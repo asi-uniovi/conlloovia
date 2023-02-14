@@ -24,7 +24,7 @@ from pulp import (
     operating_system,
     devnull,
 )
-from pulp.constants import LpBinary  # type: ignore
+from pulp.constants import LpBinary, LpInteger  # type: ignore
 
 from .model import (
     Problem,
@@ -155,6 +155,7 @@ class ConllooviaAllocator:
 
     def __create_vars(self):
         """Creates the variables for the linear programming algorithm."""
+
         for ic in self.problem.system.ics:
             for i in range(ic.limit):
                 new_vm_name = f"{ic.name}-{i}"
@@ -165,14 +166,13 @@ class ConllooviaAllocator:
 
                 for cc in self.problem.system.ccs:
                     perf = self.problem.system.perfs[(ic, cc)]
-                    for k in range(cc.limit):
-                        new_container_name = f"{ic.name}-{i}-{cc.name}-{k}"
-                        self.container_names.append(new_container_name)
-                        new_container = Container(cc=cc, vm=new_vm, num=k)
-                        self.containers[new_container_name] = new_container
-                        self.container_names_per_app[cc.app].append(new_container_name)
-                        self.container_names_per_vm[new_vm].append(new_container_name)
-                        self.container_performances[new_container_name] = perf
+                    new_container_name = f"{ic.name}-{i}-{cc.name}"
+                    self.container_names.append(new_container_name)
+                    new_container = Container(cc=cc, vm=new_vm)
+                    self.containers[new_container_name] = new_container
+                    self.container_names_per_app[cc.app].append(new_container_name)
+                    self.container_names_per_vm[new_vm].append(new_container_name)
+                    self.container_performances[new_container_name] = perf
 
         logging.info(
             "There are %d X variables and %d Z variables",
@@ -180,8 +180,12 @@ class ConllooviaAllocator:
             len(self.container_names),
         )
 
-        self.x = LpVariable.dicts(name="X", indices=self.vm_names, cat=LpBinary)
-        self.z = LpVariable.dicts(name="Z", indices=self.container_names, cat=LpBinary)
+        self.x = LpVariable.dicts(
+            name="X", indices=self.vm_names, cat=LpBinary, lowBound=0
+        )
+        self.z = LpVariable.dicts(
+            name="Z", indices=self.container_names, cat=LpInteger, lowBound=0
+        )
 
     def __price_ic_window(self, ic: InstanceClass) -> float:
         """Returns the cost of the Instance Class in the scheduling window."""
@@ -200,7 +204,9 @@ class ConllooviaAllocator:
         return perf_window.to_reduced_units().magnitude
 
     def __create_restrictions(self):
-        """Adds the performance restrictions."""
+        """Adds the problem restrictions."""
+
+        # Enough performance
         for app in self.problem.system.apps:
             self.lp_problem += (
                 lpSum(
@@ -211,8 +217,7 @@ class ConllooviaAllocator:
                 f"Enough_perf_for_{app.name}",
             )
 
-        # Core, memory and IC  restrictions
-        BIG_M = 1e6  # More than the maximum number of containers in an IC
+        # Core and memory
         for vm_name in self.vm_names:
             containers_for_this_vm = self.container_names_per_vm[self.vms[vm_name]]
 
@@ -222,7 +227,7 @@ class ConllooviaAllocator:
                     self.z[container] * self.containers[container].cc.cores.magnitude
                     for container in containers_for_this_vm
                 )
-                <= self.vms[vm_name].ic.cores.magnitude,
+                <= self.vms[vm_name].ic.cores.magnitude * self.x[vm_name],
                 f"Enough_cores_in_vm_{vm_name}",
             )
 
@@ -232,22 +237,8 @@ class ConllooviaAllocator:
                     self.z[container] * self.containers[container].cc.mem.magnitude
                     for container in containers_for_this_vm
                 )
-                <= self.vms[vm_name].ic.mem.magnitude,
+                <= self.vms[vm_name].ic.mem.magnitude * self.x[vm_name],
                 f"Enough_mem_in_vm_{vm_name}",
-            )
-
-            # IC restrictions
-            self.lp_problem += (
-                lpSum(self.z[container] for container in containers_for_this_vm)
-                <= self.x[vm_name] * BIG_M,
-                f"Enough_instances_in_vm_{vm_name}",
-            )
-
-            # Avoid idle VMs
-            self.lp_problem += (
-                self.x[vm_name]
-                <= lpSum(self.z[container] for container in containers_for_this_vm),
-                f"VM_{vm_name}_is_used",
             )
 
     def __create_solution(self, solving_stats: SolvingStats) -> Solution:

@@ -139,23 +139,23 @@ class Vm:
 
 @dataclass(frozen=True)
 class Container:
-    """Represents a container, which has a Container class and a number to
-    identify this container in the list of container classes of this VM."""
+    """Represents a set of container replicas running on a VM. It has a
+    Container class and the VM where they are running."""
 
     cc: ContainerClass
     vm: Vm
-    num: int
 
 
 @dataclass(frozen=True)
 class Allocation:
-    """Represents an allocation. It has a dictionary where the keys are the VMs
-    and the values are true or false, indicating if the VM is allocated or not.
-    It also has a dictionary where the keys are the containers and the values
-    are true or false, indicating if the container is allocated or not."""
+    """Represents an allocation. It has a dictionary, vm, where the keys are the
+    VMs and the values are true or false, indicating if the VM is allocated or
+    not. It also has a dictionary, containers, where the keys are the containers
+    and the values are ints, indicating how many replicas of the container are
+    allocated on the VM."""
 
     vms: Dict[Vm, bool]
-    containers: Dict[Container, bool]
+    containers: Dict[Container, int]
 
 
 @dataclass(frozen=True)

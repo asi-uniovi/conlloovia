@@ -4,15 +4,15 @@ from dataclasses import dataclass
 from typing import Dict, Tuple, Optional
 from enum import Enum
 
-import pint
-
-ureg = pint.UnitRegistry()
-
-# Define new units
-ureg.define("usd = [currency]")
-ureg.define("core = [computation]")
-ureg.define("millicore = 0.001 core")
-ureg.define("req = [requests]")
+from cloudmodel.unified.units import (
+    ComputationalUnits,
+    Currency,
+    CurrencyPerTime,
+    Time,
+    RequestsPerTime,
+    Storage,
+    Requests,
+)
 
 
 class Status(Enum):
@@ -42,9 +42,9 @@ class InstanceClass:
     price and limits."""
 
     name: str
-    price: pint.Quantity  # [currency]/[time]
-    cores: pint.Quantity  # [computation]
-    mem: pint.Quantity  # dimensionless
+    price: CurrencyPerTime
+    cores: ComputationalUnits
+    mem: Storage
     limit: int  # Max. number of VMs of this instance class
 
     def __post_init__(self):
@@ -60,8 +60,8 @@ class ContainerClass:
     with some resources."""
 
     name: str
-    cores: pint.Quantity  # [computation]
-    mem: pint.Quantity  # dimensionless
+    cores: ComputationalUnits
+    mem: Storage
     app: App
     limit: int  # Max. number of containers of this container class
 
@@ -79,7 +79,7 @@ class System:
     apps: Tuple[App, ...]
     ics: Tuple[InstanceClass, ...]
     ccs: Tuple[ContainerClass, ...]
-    perfs: Dict[Tuple[InstanceClass, ContainerClass], pint.Quantity]
+    perfs: Dict[Tuple[InstanceClass, ContainerClass], RequestsPerTime]
 
     def __post_init__(self):
         """Checks dimensions are valid and store them in the standard units."""
@@ -94,15 +94,15 @@ class System:
 class Workload:
     """Represents the workload for an app in a time slot."""
 
-    num_reqs: float  # [req]
-    time_slot_size: pint.Quantity  # [time]
+    num_reqs: Requests
+    time_slot_size: Time
     app: App
 
     def __post_init__(self):
-        """Checks dimensions of the time_slot_size are valid."""
-        self.time_slot_size.to(
-            "hour"
-        )  # If the dimensions are wrong, this raises an Exception
+        """Checks that the units are valid."""
+        # If the dimensions are wrong, this raises an Exception
+        self.num_reqs.to("req")
+        self.time_slot_size.to("hour")
 
 
 @dataclass(frozen=True)
@@ -112,7 +112,7 @@ class Problem:
 
     system: System
     workloads: Dict[App, Workload]
-    sched_time_size: pint.Quantity  # Size of the scheduling window [time]
+    sched_time_size: Time  # Size of the scheduling window [time]
 
     def __post_init__(self):
         """Checks dimensions of the sched_time_size are valid. In addition, it
@@ -177,7 +177,7 @@ class Solution:
 
     problem: Problem
     alloc: Allocation
-    cost: pint.Quantity  # [currency]
+    cost: Currency
     solving_stats: SolvingStats
 
     def __post_init__(self):

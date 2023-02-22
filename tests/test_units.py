@@ -5,13 +5,19 @@ import pytest
 
 import pint
 
+from cloudmodel.unified.units import (
+    ComputationalUnits,
+    Currency,
+    CurrencyPerTime,
+    Requests,
+    Time,
+    Storage,
+)
+
 from conlloovia.model import (
     InstanceClass,
     Workload,
-    ureg,
 )
-
-Q_ = ureg.Quantity
 
 
 class TestUnits(unittest.TestCase):
@@ -21,9 +27,9 @@ class TestUnits(unittest.TestCase):
         """Checks a case with valid units for an intance class."""
         InstanceClass(
             name="ic0",
-            price=Q_("1 usd/hour"),
-            cores=Q_("1 core"),
-            mem=Q_("1 megabytes"),
+            price=CurrencyPerTime("1 usd/hour"),
+            cores=ComputationalUnits("1 core"),
+            mem=Storage("1 megabytes"),
             limit=1,
         )
 
@@ -33,8 +39,8 @@ class TestUnits(unittest.TestCase):
             InstanceClass(
                 name="ic0",
                 price=1,
-                cores=Q_("1 core"),
-                mem=Q_("1 megabytes"),
+                cores=ComputationalUnits("1 core"),
+                mem=Storage("1 megabytes"),
                 limit=1,
             )
 
@@ -43,9 +49,9 @@ class TestUnits(unittest.TestCase):
         with pytest.raises(pint.DimensionalityError):
             InstanceClass(
                 name="ic0",
-                price=Q_("1 meter"),
-                cores=Q_("1 core"),
-                mem=Q_("1 megabytes"),
+                price=Time("1 s"),
+                cores=ComputationalUnits("1 core"),
+                mem=Storage("1 megabytes"),
                 limit=1,
             )
 
@@ -54,9 +60,9 @@ class TestUnits(unittest.TestCase):
         with pytest.raises(pint.DimensionalityError):
             InstanceClass(
                 name="ic0",
-                price=Q_("1 usd/hour"),
-                cores=Q_("1 meter"),
-                mem=Q_("1 megabytes"),
+                price=CurrencyPerTime("1 usd/hour"),
+                cores=Time("1 s"),
+                mem=Storage("1 megabytes"),
                 limit=1,
             )
 
@@ -65,21 +71,23 @@ class TestUnits(unittest.TestCase):
         with pytest.raises(pint.DimensionalityError):
             InstanceClass(
                 name="ic0",
-                price=Q_("1 usd/hour"),
-                cores=Q_("1 core"),
-                mem=Q_("1 meter"),
+                price=CurrencyPerTime("1 usd/hour"),
+                cores=ComputationalUnits("1 core"),
+                mem=Time("1 s"),
                 limit=1,
             )
 
     def test_valid_workload_units_1s(self):
         """Checks a case with valid units for the workload."""
-        Workload(num_reqs=1, time_slot_size=Q_("s"), app=None)
+        Workload(num_reqs=Requests("1 req"), time_slot_size=Time("s"), app=None)
 
     def test_valid_workload_units_60s(self):
         """Checks a case with valid units for the workload."""
-        Workload(num_reqs=1, time_slot_size=Q_("60s"), app=None)
+        Workload(num_reqs=Requests("1 req"), time_slot_size=Time("60s"), app=None)
 
     def test_invalid_workload_units(self):
         """Checks a case with invalid units for the workload."""
         with pytest.raises(pint.DimensionalityError):
-            Workload(num_reqs=1, time_slot_size=Q_("meter"), app=None)
+            Workload(
+                num_reqs=Requests("1 req"), time_slot_size=Currency("1 usd"), app=None
+            )

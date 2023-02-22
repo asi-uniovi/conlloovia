@@ -10,7 +10,13 @@ with open("README.md") as readme_file:
 with open("HISTORY.rst") as history_file:
     history = history_file.read()
 
-requirements = ["Click>=7.0", "pint", "pulp", "rich"]
+requirements = [
+    "Click>=7.0",
+    "pint",
+    "pulp",
+    "rich",
+    "cloudmodel @ git+https://jentrialgo@github.com/jldiaz-uniovi/cloudmodel.git@main#egg=cloudmodel",
+]
 
 test_requirements = [
     "pytest>=3",

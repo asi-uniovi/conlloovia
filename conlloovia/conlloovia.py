@@ -5,7 +5,7 @@ linear programming problem using pulp."""
 import os
 import time
 import logging
-from typing import List, Dict, Any
+from typing import Any
 
 import pulp  # type: ignore
 
@@ -26,6 +26,10 @@ from pulp import (
 )
 from pulp.constants import LpBinary, LpInteger  # type: ignore
 
+from cloudmodel.unified.units import (
+    Currency,
+)
+
 from .model import (
     Problem,
     InstanceClass,
@@ -36,7 +40,6 @@ from .model import (
     Solution,
     Status,
     SolvingStats,
-    ureg,
 )
 
 
@@ -72,14 +75,14 @@ class ConllooviaAllocator:
             problem: problem to solve"""
         self.problem = problem
 
-        self.vm_names: List[str] = []
-        self.vms: Dict[str, Vm] = {}
+        self.vm_names: list[str] = []
+        self.vms: dict[str, Vm] = {}
 
-        self.container_names: List[str] = []
-        self.containers: Dict[str, Container] = {}
-        self.container_performances: Dict[str, float] = {}
-        self.container_names_per_app: Dict[App, list[Container]] = {}
-        self.container_names_per_vm: Dict[Vm, list[Container]] = {}
+        self.container_names: list[str] = []
+        self.containers: dict[str, Container] = {}
+        self.container_performances: dict[str, float] = {}
+        self.container_names_per_app: dict[App, list[Container]] = {}
+        self.container_names_per_vm: dict[Vm, list[Container]] = {}
 
         for app in self.problem.system.apps:
             self.container_names_per_app[app] = []
@@ -213,7 +216,7 @@ class ConllooviaAllocator:
                     self.z[name] * self.__perf_in_window(name)
                     for name in self.container_names_per_app[app]
                 )
-                >= self.problem.workloads[app].num_reqs,
+                >= self.problem.workloads[app].num_reqs.magnitude,
                 f"Enough_perf_for_{app.name}",
             )
 
@@ -260,9 +263,9 @@ class ConllooviaAllocator:
         )
 
         if solving_stats.status in [Status.OPTIMAL, Status.INTEGER_FEASIBLE]:
-            cost = pulp.value(self.lp_problem.objective) * ureg.usd
+            cost = pulp.value(self.lp_problem.objective) * Currency("1 usd")
         else:
-            cost = ureg.Quantity("0 usd")
+            cost = Currency("0 usd")
 
         sol = Solution(
             problem=self.problem,

@@ -76,6 +76,15 @@ If you want to use the package in your own code, import the required classes:
 ```python
 import logging  # Used to show the output of the solver at the end
 
+from cloudmodel.unified.units import (
+    ComputationalUnits,
+    CurrencyPerTime,
+    Time,
+    RequestsPerTime,
+    Storage,
+    Requests,
+)
+
 from conlloovia import (
     App,
     InstanceClass,
@@ -87,47 +96,48 @@ from conlloovia import (
     ureg,
 )
 from conlloovia.visualization import SolutionPrettyPrinter
-
-Q_ = ureg.Quantity  # Shortcut to create quantities with units, e.g. Q_("1 core")
 ```
 
 Create the objects that represent the system, the workload and the problem:
 
 ```python
-apps = (
-    App(name="app0"),
-)
+apps = (App(name="app0"),)
 
-# Instance classes
 ics = (
     InstanceClass(
         name="m5.large",
-        price=Q_("0.2 usd/hour"),
-        cores=Q_("1 core"),
-        mem=Q_("8 gibibytes"),
+        price=CurrencyPerTime("0.2 usd/hour"),
+        cores=ComputationalUnits("1 core"),
+        mem=Storage("8 gibibytes"),
         limit=5,
     ),
     InstanceClass(
         name="m5.xlarge",
-        price=Q_("0.4 usd/hour"),
-        cores=Q_("2 cores"),
-        mem=Q_("16 gibibytes"),
+        price=CurrencyPerTime("0.4 usd/hour"),
+        cores=ComputationalUnits("2 cores"),
+        mem=Storage("16 gibibytes"),
         limit=5,
     ),
 )
 
-# Container classes
 ccs = (
     ContainerClass(
-        name="1c2g", cores=Q_("1 core"), mem=Q_("2 gibibytes"), app=apps[0], limit=10
+        name="1c2g",
+        cores=ComputationalUnits("1 core"),
+        mem=Storage("2 gibibytes"),
+        app=apps[0],
+        limit=10,
     ),
     ContainerClass(
-        name="2c2g", cores=Q_("2 core"), mem=Q_("2 gibibytes"), app=apps[0], limit=10
+        name="2c2g",
+        cores=ComputationalUnits("2 core"),
+        mem=Storage("2 gibibytes"),
+        app=apps[0],
+        limit=10,
     ),
 )
 
-# Performance of each container class in each instance class
-base_perf = Q_("1 req/s")
+base_perf = RequestsPerTime("1 req/s")
 perfs = {
     (ics[0], ccs[0]): base_perf,
     (ics[0], ccs[1]): 1.5 * base_perf,
@@ -135,14 +145,12 @@ perfs = {
     (ics[1], ccs[1]): 1.5 * base_perf * 1.2,
 }
 
-# Join everything in a System object
 system = System(apps=apps, ics=ics, ccs=ccs, perfs=perfs)
 
-# Workload of each application, in this case 10 requests per second
 app = system.apps[0]
-workload = Workload(num_reqs=10, time_slot_size=Q_("s"), app=app)
+workload = Workload(num_reqs=Requests("10 req"), time_slot_size=Time("1 s"), app=app)
 workloads = {app: workload}
-problem = Problem(system=system, workloads=workloads, sched_time_size=Q_("s"))
+problem = Problem(system=system, workloads=workloads, sched_time_size=Time("1 s"))
 ```
 
 Optionally, set the logging level to `INFO` to see the output of the solver:

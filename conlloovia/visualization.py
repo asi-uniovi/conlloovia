@@ -20,10 +20,7 @@ class SolutionPrettyPrinter:
 
     def get_summary(self) -> str:
         """Returns a summary of the solution."""
-        if self.sol.solving_stats.status not in [
-            Status.OPTIMAL,
-            Status.INTEGER_FEASIBLE,
-        ]:
+        if self.is_infeasible_sol():
             return f"Non feasible solution. [bold red]{self.sol.solving_stats.status}"
 
         res = f"\nTotal cost: {self.sol.cost}"
@@ -39,6 +36,11 @@ class SolutionPrettyPrinter:
         )
         for app, workload in self.sol.problem.workloads.items():
             print(f"    {app.name}: {workload.num_reqs} requests")
+
+        if self.is_infeasible_sol():
+            print(f"Non feasible solution. [bold red]{self.sol.solving_stats.status}")
+            return
+
         print()
 
         print(self.get_ic_table())
@@ -47,6 +49,11 @@ class SolutionPrettyPrinter:
 
     def get_ic_table(self) -> Table:
         """Returns a Rich table with information about the instance classes."""
+        if self.is_infeasible_sol():
+            return Table(
+                title=f"Non feasible solution. [bold red]{self.sol.solving_stats.status}"
+            )
+
         table = Table(
             "VM",
             "Cost",
@@ -80,6 +87,11 @@ class SolutionPrettyPrinter:
 
     def get_cc_table(self) -> Table:
         """Returns a Rich table with information about the container classes."""
+        if self.is_infeasible_sol():
+            return Table(
+                title=f"Non feasible solution. [bold red]{self.sol.solving_stats.status}"
+            )
+
         table = Table(
             "VM",
             "Container",
@@ -122,3 +134,10 @@ class SolutionPrettyPrinter:
         )
 
         return table
+
+    def is_infeasible_sol(self):
+        """Returns True if the solution is infeasible."""
+        return self.sol.solving_stats.status not in [
+            Status.OPTIMAL,
+            Status.INTEGER_FEASIBLE,
+        ]

@@ -4,11 +4,8 @@ conlloovia."""
 from rich.console import Console
 from rich.table import Table
 from rich import print
-import pint
 
 from .model import Solution, Status
-
-ureg = pint.UnitRegistry()
 
 
 class SolutionPrettyPrinter:

@@ -95,7 +95,7 @@ from conlloovia import (
     ConllooviaAllocator,
     ureg,
 )
-from conlloovia.visualization import SolutionPrettyPrinter
+from conlloovia.visualization import SolutionPrettyPrinter, ProblemPrettyPrinter
 ```
 
 Create the objects that represent the system, the workload and the problem:
@@ -150,7 +150,13 @@ system = System(apps=apps, ics=ics, ccs=ccs, perfs=perfs)
 app = system.apps[0]
 workload = Workload(num_reqs=Requests("10 req"), time_slot_size=Time("1 s"), app=app)
 workloads = {app: workload}
-problem = Problem(system=system, workloads=workloads, sched_time_size=Time("1 s"))
+problem = Problem(system=system, workloads=workloads, sched_time_size=Time("1 s"))```
+```
+
+You can print the problem with:
+
+```python
+ProblemPrettyPrinter(problem).print()
 ```
 
 Optionally, set the logging level to `INFO` to see the output of the solver:

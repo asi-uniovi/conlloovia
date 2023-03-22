@@ -5,7 +5,7 @@ from rich.console import Console
 from rich.table import Table
 from rich import print
 
-from .model import Solution, Status
+from .model import Solution, Status, Problem
 
 
 class SolutionPrettyPrinter:
@@ -32,7 +32,7 @@ class SolutionPrettyPrinter:
             f"Workloads (scheduling time window: {self.sol.problem.sched_time_size}):"
         )
         for app, workload in self.sol.problem.workloads.items():
-            print(f"    {app.name}: {workload.num_reqs} requests")
+            print(f"    {app.name}: {workload.num_reqs}")
 
         if self.is_infeasible_sol():
             print(f"Non feasible solution. [bold red]{self.sol.solving_stats.status}")
@@ -121,7 +121,7 @@ class SolutionPrettyPrinter:
 
             perf = self.sol.problem.system.perfs[ic, cc]
             perf = (perf * self.sol.problem.sched_time_size).to_reduced_units()
-            table.add_row("", f"{cc.name}[{num_replicas}]", app.name, str(perf))
+            table.add_row("", f"{cc.name}[{int(num_replicas)}]", app.name, str(perf))
 
         table.add_section()
         table.add_row(
@@ -138,3 +138,107 @@ class SolutionPrettyPrinter:
             Status.OPTIMAL,
             Status.INTEGER_FEASIBLE,
         ]
+
+
+class ProblemPrettyPrinter:
+    """Utility functions to show pretty presentation of a problem."""
+
+    def __init__(self, problem: Problem) -> None:
+        self.problem: Problem = problem
+
+    def print(self) -> None:
+        """Prints information about the problem."""
+        self.print_ics()
+        self.print_ccs()
+        self.print_apps()
+        self.print_perfs()
+
+    def table_ics(self) -> Table:
+        """Returns a table with information about the instance classes."""
+        table = Table(title="Instance classes")
+        table.add_column("Instance class")
+        table.add_column("Cores")
+        table.add_column("Mem")
+        table.add_column("Price")
+        table.add_column("Limit")
+
+        for ic in self.problem.system.ics:
+            table.add_row(
+                ic.name, str(ic.cores), str(ic.mem), str(ic.price), str(ic.limit)
+            )
+
+        return table
+
+    def print_ics(self) -> None:
+        """Prints information about the instance classes."""
+        print(self.table_ics())
+
+    def table_ccs(self) -> Table:
+        """Returns a table with information about the container classes."""
+        table = Table(title="Container classes")
+        table.add_column("Container class")
+        table.add_column("Cores")
+        table.add_column("Mem")
+        table.add_column("Limit")
+
+        for cc in self.problem.system.ccs:
+            table.add_row(cc.name, str(cc.cores), str(cc.mem), str(cc.limit))
+
+        return table
+
+    def print_ccs(self) -> None:
+        """Prints information about the container classes."""
+        print(self.table_ccs())
+
+    def table_apps(self) -> Table:
+        """Returns a rich table with information about the apps, including the
+        workload"""
+        table = Table(title="Apps")
+        table.add_column("Name")
+        table.add_column("Workload")
+
+        for app in self.problem.system.apps:
+            wl = self.problem.workloads[app]
+            table.add_row(app.name, str(wl.num_reqs / wl.time_slot_size))
+
+        return table
+
+    def print_apps(self) -> None:
+        """Prints information about the apps."""
+        print(self.table_apps())
+
+    def print_perfs(self) -> None:
+        """Prints information about the performance."""
+        table = Table(title="Performances")
+        table.add_column("Instance class")
+        table.add_column("Container class")
+        table.add_column("App")
+        table.add_column("RPS")
+        table.add_column("Price per million req.")
+
+        for ic in self.problem.system.ics:
+            first = True
+            for app in self.problem.system.apps:
+                for cc in self.problem.system.ccs:
+                    if app != cc.app or (ic, cc) not in self.problem.system.perfs:
+                        continue  # Not all ICs handle all ccs
+
+                    if first:
+                        ic_column = f"{ic.name}"
+                        first = False
+                    else:
+                        ic_column = ""
+
+                    perf = self.problem.system.perfs[(ic, cc)]
+                    price_per_1k_req = 1e6 * (ic.price.to("usd/h") / perf.to("req/h"))
+                    table.add_row(
+                        ic_column,
+                        cc.name,
+                        app.name,
+                        str(perf.to("req/s")),
+                        f"{price_per_1k_req:.2f}",
+                    )
+
+            table.add_section()
+
+        print(table)

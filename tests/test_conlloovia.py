@@ -17,7 +17,7 @@ from cloudmodel.unified.units import (
 )
 
 from conlloovia.conlloovia import ConllooviaAllocator
-from conlloovia.visualization import SolutionPrettyPrinter
+from conlloovia.visualization import SolutionPrettyPrinter, ProblemPrettyPrinter
 from conlloovia.model import (
     InstanceClass,
     App,
@@ -88,6 +88,8 @@ class TestSystem1ic1cc(unittest.TestCase):
         problem = Problem(
             system=self.system, workloads=workloads, sched_time_size=Time("s")
         )
+
+        ProblemPrettyPrinter(problem).print()
 
         alloc = ConllooviaAllocator(problem)
         sol = alloc.solve()
@@ -268,6 +270,8 @@ class TestSystem2ic2cc(unittest.TestCase):
         problem = Problem(
             system=self.system, workloads=workloads, sched_time_size=Time("s")
         )
+
+        ProblemPrettyPrinter(problem).print()
 
         alloc = ConllooviaAllocator(problem)
         sol = alloc.solve()

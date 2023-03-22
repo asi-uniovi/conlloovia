@@ -25,20 +25,10 @@ class SolutionPrettyPrinter:
         return res
 
     def print(self):
-        """Prints a table for each application and a summary of the solution."""
-        print()
-
-        print(
-            f"Workloads (scheduling time window: {self.sol.problem.sched_time_size}):"
-        )
-        for app, workload in self.sol.problem.workloads.items():
-            print(f"    {app.name}: {workload.num_reqs}")
-
+        """Prints a tables and a summary of the solution."""
         if self.is_infeasible_sol():
             print(f"Non feasible solution. [bold red]{self.sol.solving_stats.status}")
             return
-
-        print()
 
         print(self.get_ic_table())
         print(self.get_cc_table())

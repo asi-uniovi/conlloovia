@@ -2,7 +2,7 @@
 conlloovia."""
 
 from rich.console import Console
-from rich.table import Table
+from rich.table import Table, Column
 from rich import print
 
 from .model import Solution, Status, Problem
@@ -53,7 +53,7 @@ class SolutionPrettyPrinter:
 
         table = Table(
             "VM",
-            "Cost",
+            Column(header="Cost", justify="right"),
             title="Allocation (only used VMs)",
         )
 
@@ -93,7 +93,7 @@ class SolutionPrettyPrinter:
             "VM",
             "Container",
             "App",
-            "Perf",
+            Column(header="Perf", justify="right"),
             title="Allocation (only used containers)",
         )
 
@@ -157,10 +157,10 @@ class ProblemPrettyPrinter:
         """Returns a table with information about the instance classes."""
         table = Table(title="Instance classes")
         table.add_column("Instance class")
-        table.add_column("Cores")
-        table.add_column("Mem")
-        table.add_column("Price")
-        table.add_column("Limit")
+        table.add_column("Cores", justify="right")
+        table.add_column("Mem", justify="right")
+        table.add_column("Price", justify="right")
+        table.add_column("Limit", justify="right")
 
         for ic in self.problem.system.ics:
             table.add_row(
@@ -177,9 +177,9 @@ class ProblemPrettyPrinter:
         """Returns a table with information about the container classes."""
         table = Table(title="Container classes")
         table.add_column("Container class")
-        table.add_column("Cores")
-        table.add_column("Mem")
-        table.add_column("Limit")
+        table.add_column("Cores", justify="right")
+        table.add_column("Mem", justify="right")
+        table.add_column("Limit", justify="right")
 
         for cc in self.problem.system.ccs:
             table.add_row(cc.name, str(cc.cores), str(cc.mem), str(cc.limit))
@@ -195,7 +195,7 @@ class ProblemPrettyPrinter:
         workload"""
         table = Table(title="Apps")
         table.add_column("Name")
-        table.add_column("Workload")
+        table.add_column("Workload", justify="right")
 
         for app in self.problem.system.apps:
             wl = self.problem.workloads[app]
@@ -213,8 +213,8 @@ class ProblemPrettyPrinter:
         table.add_column("Instance class")
         table.add_column("Container class")
         table.add_column("App")
-        table.add_column("RPS")
-        table.add_column("Price per million req.")
+        table.add_column("RPS", justify="right")
+        table.add_column("Price per million req.", justify="right")
 
         for ic in self.problem.system.ics:
             first = True

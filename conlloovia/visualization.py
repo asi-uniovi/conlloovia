@@ -44,7 +44,7 @@ class SolutionPrettyPrinter:
         table = Table(
             "VM",
             Column(header="Cost", justify="right"),
-            title="Allocation (only used VMs)",
+            title="VM allocation (only used VMs)",
         )
 
         alloc = self.sol.alloc
@@ -84,7 +84,7 @@ class SolutionPrettyPrinter:
             "Container",
             "App",
             Column(header="Perf", justify="right"),
-            title="Allocation (only used containers)",
+            title="Container allocation (only used containers)",
         )
 
         alloc = self.sol.alloc
@@ -103,15 +103,20 @@ class SolutionPrettyPrinter:
             ic = vm.ic
             app = cc.app
 
+            perf = self.sol.problem.system.perfs[ic, cc]
+            perf = (perf * self.sol.problem.sched_time_size).to_reduced_units()
+
             if vm != prev_vm:
                 total_num_vms += 1
                 table.add_section()
                 prev_vm = vm
-                table.add_row(f"{ic.name}[{vm.num}]", "", "")
+                ic_col = f"{ic.name}[{vm.num}]"
+            else:
+                ic_col = ""
 
-            perf = self.sol.problem.system.perfs[ic, cc]
-            perf = (perf * self.sol.problem.sched_time_size).to_reduced_units()
-            table.add_row("", f"{cc.name}[{int(num_replicas)}]", app.name, str(perf))
+            table.add_row(
+                ic_col, f"{cc.name}[{int(num_replicas)}]", app.name, str(perf)
+            )
 
         table.add_section()
         table.add_row(

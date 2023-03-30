@@ -84,7 +84,7 @@ class SolutionPrettyPrinter:
             "Container",
             "App",
             Column(header="Perf", justify="right"),
-            title="Container allocation (only used containers)",
+            title="Container allocation (only used VMs)",
         )
 
         alloc = self.sol.alloc
@@ -96,7 +96,7 @@ class SolutionPrettyPrinter:
             if num_replicas == 0:
                 continue
 
-            total_num_containers += 1
+            total_num_containers += num_replicas
 
             vm = container.vm
             cc = container.cc
@@ -115,13 +115,13 @@ class SolutionPrettyPrinter:
                 ic_col = ""
 
             table.add_row(
-                ic_col, f"{cc.name}[{int(num_replicas)}]", app.name, str(perf)
+                ic_col, f"{cc.name} (x{int(num_replicas)})", app.name, str(perf)
             )
 
         table.add_section()
         table.add_row(
             f"total: {total_num_vms}",
-            f"{total_num_containers}",
+            f"{int(total_num_containers)}",
             "",
         )
 
@@ -230,8 +230,8 @@ class ProblemPrettyPrinter:
                         ic_column,
                         cc.name,
                         app.name,
-                        str(perf.to("req/s")),
-                        f"{price_per_1k_req:.2f}",
+                        str(perf.to("req/s").magnitude),
+                        f"{price_per_1k_req.magnitude:.2f}",
                     )
 
             table.add_section()

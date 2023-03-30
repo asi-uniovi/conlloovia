@@ -93,7 +93,6 @@ from conlloovia import (
     Workload,
     Problem,
     ConllooviaAllocator,
-    ureg,
 )
 from conlloovia.visualization import SolutionPrettyPrinter, ProblemPrettyPrinter
 ```

@@ -1,11 +1,14 @@
-"""Main module of the conlloovia package. It defines the class ConllooviaAllocator,
-which receives a conlloovia problem and constructs and solves the corresponding
-linear programming problem using pulp."""
+"""Main module of the conlloovia package. It defines the class
+ConllooviaAllocator, which receives a conlloovia problem and constructs and
+solves the corresponding linear programming problem using pulp. It also
+defines GreedyAllocator, which is a simple greedy allocator that chooses the
+cheapest instance class for each app in terms of performance per dollar.gr"""
 
+import math
+import logging
 import os
 import time
-import logging
-from typing import Any
+from typing import Any, Dict
 
 import pulp  # type: ignore
 
@@ -26,13 +29,12 @@ from pulp import (
 )
 from pulp.constants import LpBinary, LpInteger  # type: ignore
 
-from cloudmodel.unified.units import (
-    Currency,
-)
+from cloudmodel.unified.units import Currency
 
 from .model import (
     Problem,
     InstanceClass,
+    ContainerClass,
     App,
     Allocation,
     Vm,
@@ -68,7 +70,7 @@ class ConllooviaAllocator:
     """This class receives a problem of container allocation and gives methods
     to solve it and store the solution."""
 
-    def __init__(self, problem: Problem):
+    def __init__(self, problem: Problem) -> None:
         """Constructor.
 
         Args:
@@ -156,7 +158,7 @@ class ConllooviaAllocator:
 
         return solving_stats
 
-    def __create_vars(self):
+    def __create_vars(self) -> None:
         """Creates the variables for the linear programming algorithm."""
 
         for ic in self.problem.system.ics:
@@ -194,7 +196,7 @@ class ConllooviaAllocator:
         """Returns the cost of the Instance Class in the scheduling window."""
         return (ic.price * self.problem.sched_time_size).to_reduced_units().magnitude
 
-    def __create_objective(self):
+    def __create_objective(self) -> None:
         """Adds the cost function to optimize."""
         self.lp_problem += lpSum(
             self.x[vm] * self.__price_ic_window(self.vms[vm].ic) for vm in self.vm_names
@@ -206,7 +208,7 @@ class ConllooviaAllocator:
         perf_window = self.container_performances[name] * self.problem.sched_time_size
         return perf_window.to_reduced_units().magnitude
 
-    def __create_restrictions(self):
+    def __create_restrictions(self) -> None:
         """Adds the problem restrictions."""
 
         # Enough performance
@@ -276,7 +278,7 @@ class ConllooviaAllocator:
 
         return sol
 
-    def __log_solution(self, solving_stats: SolvingStats):
+    def __log_solution(self, solving_stats: SolvingStats) -> None:
         if solving_stats.status not in [Status.OPTIMAL, Status.INTEGER_FEASIBLE]:
             logging.info("No feasible solution. Solving stats: %s", solving_stats)
             return
@@ -293,6 +295,234 @@ class ConllooviaAllocator:
 
         logging.info("Total cost: %f", pulp.value(self.lp_problem.objective))
         logging.info("Solving stats: %s", solving_stats)
+
+
+class GreedyAllocator:
+    """Greedy allocator that selects the cheapest instance class (in terms of
+    cores per dollar) and the smallest container class (in terms of cores)."""
+
+    def __init__(self, problem: Problem) -> None:
+        """Constructor.
+
+        Args:
+            problem: problem to solve"""
+        self.problem = problem
+
+        self.vms: dict[str, Vm] = {}
+        self.containers: dict[str, Container] = {}
+
+        start_creation = time.perf_counter()
+
+        self.create_vms_and_containers()
+
+        # Precalculate the cheapest instance class in terms of cores per dollar.
+        # If there are several, select the one with the smallest number of
+        # cores.
+        self.cheapest_ic = self.compute_cheapest_ic()
+        self.cheapest_vms = [
+            vm for vm in self.vms.values() if vm.ic == self.cheapest_ic
+        ]
+
+        # Precompute the smallest container class for each app
+        self.smallest_ccs_per_app: Dict[App, ContainerClass] = {}
+        for app in problem.system.apps:
+            ccs_for_app = [cc for cc in problem.system.ccs if cc.app == app]
+            self.smallest_ccs_per_app[app] = min(ccs_for_app, key=lambda cc: cc.cores)
+
+        end_creation = time.perf_counter()
+        self.creation_time = end_creation - start_creation
+
+    def compute_cheapest_ic(self):
+        """Returns the cheapest instance class in terms of cores per dollar.
+        If there are several, select the one with the smallest number of
+        cores."""
+        return min(
+            self.problem.system.ics,
+            key=lambda ic: (
+                ic.price.to("usd/h") / ic.cores,
+                ic.cores,
+            ),
+        )
+
+    def create_vms_and_containers(self) -> None:
+        for ic in self.problem.system.ics:
+            for i in range(ic.limit):
+                new_vm_name = f"{ic.name}-{i}"
+                new_vm = Vm(ic=ic, num=i)
+                self.vms[new_vm_name] = new_vm
+
+                for cc in self.problem.system.ccs:
+                    new_container_name = f"{ic.name}-{i}-{cc.name}"
+                    new_container = Container(cc=cc, vm=new_vm)
+                    self.containers[new_container_name] = new_container
+
+    def compute_num_ccs_per_app(self) -> Dict[App, int]:
+        """Computes the number of CCs needed for each app according to its
+        workload."""
+        num_ccs = {}
+        for app in self.problem.system.apps:
+            cc = self.smallest_ccs_per_app[app]
+            cc_perf = self.problem.system.perfs[self.cheapest_ic, cc]
+            cc_reqs_in_sched_ts = cc_perf * self.problem.sched_time_size
+
+            num_ccs[app] = math.ceil(
+                self.problem.workloads[app].num_reqs / cc_reqs_in_sched_ts
+            )
+
+        return num_ccs
+
+    def create_infeasible_solution(self, start_solving: float) -> Solution:
+        """Creates an infeasible solution. The parameter start_solving is the
+        time when the solving started."""
+        alloc = Allocation(
+            vms=self.create_initial_vm_alloc(),
+            containers=self.create_initial_container_alloc(),
+        )
+
+        sol = Solution(
+            problem=self.problem,
+            alloc=alloc,
+            cost=Currency("0 usd"),
+            solving_stats=SolvingStats(
+                frac_gap=0,
+                max_seconds=0,
+                lower_bound=0,
+                creation_time=self.creation_time,
+                solving_time=time.perf_counter() - start_solving,
+                status=Status.INFEASIBLE,
+            ),
+        )
+
+        return sol
+
+    def create_initial_vm_alloc(self) -> Dict[Vm, bool]:
+        """Creates an initial VM allocation where no VM is allocated."""
+        vm_alloc: Dict[Vm, bool] = {}
+        for vm in self.vms.values():
+            vm_alloc[vm] = False
+
+        return vm_alloc
+
+    def create_initial_container_alloc(self) -> Dict[Container, int]:
+        """Creates an initial container allocation where no container is
+        allocated."""
+        container_alloc: Dict[Container, int] = {}
+        for container in self.containers.values():
+            container_alloc[container] = 0
+
+        return container_alloc
+
+    def solve(self) -> Solution:
+        """Solves the problem using a Greedy algorithm.
+
+        Returns:
+            solution to the problem
+        """
+
+        start_solving = time.perf_counter()
+
+        # Compute the number of CCs needed for each app according to its
+        # workload
+        num_ccs_per_app = self.compute_num_ccs_per_app()
+
+        # Initialize the VM alloc to 0 for all VMs
+        vm_alloc = self.create_initial_vm_alloc()
+
+        # Initialize the container alloc to 0 for all containers
+        container_alloc = self.create_initial_container_alloc()
+
+        # Compute the number of VMs needed in total. Start assigning CCs and
+        # when the number of cores of the VM exceeds the number of cores of the
+        # cheapest instance class, create a new VM. Create the allocation and
+        # compute the cost at the same time.
+        num_vms = 0
+        num_cores = 0  # Number of used cores of this VM
+        current_vm = None
+        cost = Currency("0 usd")
+        for app in self.problem.system.apps:
+            cc = self.smallest_ccs_per_app[app]
+            logging.info(
+                "Allocating %i %s CCs for app %s",
+                num_ccs_per_app[app],
+                cc.name,
+                app.name,
+            )
+
+            if cc.cores > self.cheapest_ic.cores:
+                logging.info(
+                    "  Not enough cores for containers of app %s in the cheapest VM",
+                    app.name,
+                )
+                return self.create_infeasible_solution(start_solving)
+
+            for _ in range(num_ccs_per_app[app]):
+                new_num_cores = num_cores + cc.cores
+
+                if current_vm is None or new_num_cores > current_vm.ic.cores:
+                    # We need a new VM
+                    if num_vms == len(self.cheapest_vms):
+                        logging.info("  Not enough VMs")
+                        return self.create_infeasible_solution(start_solving)
+
+                    current_vm = self.cheapest_vms[num_vms]
+                    cost += current_vm.ic.price * self.problem.sched_time_size
+                    vm_alloc[current_vm] = True
+
+                    num_vms += 1
+                    num_cores = 0
+
+                    logging.info(
+                        "  Using %i/%i VMs (%s)", num_vms, len(self.cheapest_vms), cost
+                    )
+
+                num_cores += cc.cores
+                logging.info(
+                    "    Using %s of VM %i (total of %s/%s)",
+                    cc.cores,
+                    num_vms - 1,
+                    num_cores,
+                    current_vm.ic.cores,
+                )
+
+                container = self.containers[
+                    f"{current_vm.ic.name}-{current_vm.num}-{cc.name}"
+                ]
+                container_alloc[container] += 1
+                if container_alloc[container] > cc.limit:
+                    logging.info(
+                        "  Not enough containers of class %s in VM %s-%i",
+                        cc.name,
+                        current_vm.ic.name,
+                        current_vm.num,
+                    )
+
+                    # Another possibility would be to try to use the next CC
+                    # and so on, but it's not worth it.
+                    return self.create_infeasible_solution(start_solving)
+
+        # Create the allocation
+        alloc = Allocation(
+            vms=vm_alloc,
+            containers=container_alloc,
+        )
+
+        solving_stats = SolvingStats(
+            frac_gap=0,
+            max_seconds=0,
+            lower_bound=0,
+            creation_time=self.creation_time,
+            solving_time=time.perf_counter() - start_solving,
+            status=Status.INTEGER_FEASIBLE,
+        )
+
+        sol = Solution(
+            problem=self.problem,
+            alloc=alloc,
+            cost=cost,
+            solving_stats=solving_stats,
+        )
+
+        return sol
 
 
 # pylint: disable = E, W, R, C

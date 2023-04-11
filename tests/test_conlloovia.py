@@ -16,7 +16,7 @@ from cloudmodel.unified.units import (
     Storage,
 )
 
-from conlloovia.conlloovia import ConllooviaAllocator
+from conlloovia.conlloovia import ConllooviaAllocator, GreedyAllocator
 from conlloovia.visualization import SolutionPrettyPrinter, ProblemPrettyPrinter
 from conlloovia.model import (
     InstanceClass,
@@ -99,9 +99,9 @@ class TestSystem1ic1cc(unittest.TestCase):
         self.assertEqual(sum(sol.alloc.vms.values()), 1)
         self.assertEqual(sum(sol.alloc.containers.values()), 1)
 
-    def test_only_one_with_empty_solver(self):
-        """Tests that only one VM and container is required, using a solver with
-        no options."""
+    def test_only_one_greedy(self):
+        """Tests that only one VM and container is required, using the greedy
+        allocator."""
         self.__set_up()
 
         app = self.system.apps[0]
@@ -113,11 +113,10 @@ class TestSystem1ic1cc(unittest.TestCase):
             system=self.system, workloads=workloads, sched_time_size=Time("s")
         )
 
-        alloc = ConllooviaAllocator(problem)
-        solver = PULP_CBC_CMD()
-        sol = alloc.solve(solver)
+        alloc = GreedyAllocator(problem)
+        sol = alloc.solve()
 
-        self.assertEqual(sol.solving_stats.status, Status.OPTIMAL)
+        self.assertEqual(sol.solving_stats.status, Status.INTEGER_FEASIBLE)
         self.assertEqual(sol.cost, Currency("0.2/3600 usd"))
         self.assertEqual(sum(sol.alloc.vms.values()), 1)
         self.assertEqual(sum(sol.alloc.containers.values()), 1)
@@ -259,6 +258,28 @@ class TestSystem2ic2cc(unittest.TestCase):
 
         self.system = System(apps=apps, ics=ics, ccs=ccs, perfs=perfs)
 
+    def __solve_greedy(self, reqs):
+        self.__set_up()
+
+        app = self.system.apps[0]
+        workload = Workload(
+            num_reqs=Requests(f"{reqs} req"), time_slot_size=Time("s"), app=app
+        )
+        workloads = {app: workload}
+        problem = Problem(
+            system=self.system, workloads=workloads, sched_time_size=Time("s")
+        )
+
+        ProblemPrettyPrinter(problem).print()
+
+        alloc = GreedyAllocator(problem)
+
+        # Check that the cheapest ic is ics[0]
+        self.assertEqual(alloc.compute_cheapest_ic(), self.system.ics[0])
+
+        sol = alloc.solve()
+        return workload, sol
+
     def test_perf10(self):
         self.__set_up()
 
@@ -348,6 +369,113 @@ class TestSystem2ic2cc(unittest.TestCase):
             workload.num_reqs.magnitude,
             total_perf.to(RequestsPerTime("req/s")).magnitude,
         )
+
+    def test_perf1_greedy(self):
+        reqs = 1
+        workload, sol = self.__solve_greedy(reqs)
+
+        SolutionPrettyPrinter(sol).print()
+
+        self.assertAlmostEqual(sol.cost, Currency("0.2/3600 usd"))
+        self.assertEqual(sum(sol.alloc.vms.values()), 1)
+
+        vms_ics0 = [
+            vm
+            for vm in sol.alloc.vms
+            if (vm.ic == self.system.ics[0] and sol.alloc.vms[vm])
+        ]
+        self.assertEqual(len(vms_ics0), 1)
+
+        vms_ics1 = [
+            vm
+            for vm in sol.alloc.vms
+            if (vm.ic == self.system.ics[1] and sol.alloc.vms[vm])
+        ]
+        self.assertEqual(len(vms_ics1), 0)
+
+        total_perf = sum(
+            self.system.perfs[c.vm.ic, c.cc] * sol.alloc.containers[c]
+            for c in sol.alloc.containers
+            if sol.alloc.containers[c]
+        )
+        self.assertLessEqual(
+            workload.num_reqs.magnitude,
+            total_perf.to(RequestsPerTime("req/s")).magnitude,
+        )
+
+    def test_perf4_greedy(self):
+        reqs = 4
+        workload, sol = self.__solve_greedy(reqs)
+
+        SolutionPrettyPrinter(sol).print()
+
+        self.assertAlmostEqual(sol.cost, Currency("4*0.2/3600 usd"))
+        self.assertEqual(sum(sol.alloc.vms.values()), 4)
+
+        vms_ics0 = [
+            vm
+            for vm in sol.alloc.vms
+            if (vm.ic == self.system.ics[0] and sol.alloc.vms[vm])
+        ]
+        self.assertEqual(len(vms_ics0), 4)
+
+        vms_ics1 = [
+            vm
+            for vm in sol.alloc.vms
+            if (vm.ic == self.system.ics[1] and sol.alloc.vms[vm])
+        ]
+        self.assertEqual(len(vms_ics1), 0)
+
+        total_perf = sum(
+            self.system.perfs[c.vm.ic, c.cc] * sol.alloc.containers[c]
+            for c in sol.alloc.containers
+            if sol.alloc.containers[c]
+        )
+        self.assertLessEqual(
+            workload.num_reqs.magnitude,
+            total_perf.to(RequestsPerTime("req/s")).magnitude,
+        )
+
+    def test_perf5_greedy(self):
+        reqs = 5
+        workload, sol = self.__solve_greedy(reqs)
+
+        SolutionPrettyPrinter(sol).print()
+
+        self.assertAlmostEqual(sol.cost, Currency("5*0.2/3600 usd"))
+        self.assertEqual(sum(sol.alloc.vms.values()), 5)
+
+        vms_ics0 = [
+            vm
+            for vm in sol.alloc.vms
+            if (vm.ic == self.system.ics[0] and sol.alloc.vms[vm])
+        ]
+        self.assertEqual(len(vms_ics0), 5)
+
+        vms_ics1 = [
+            vm
+            for vm in sol.alloc.vms
+            if (vm.ic == self.system.ics[1] and sol.alloc.vms[vm])
+        ]
+        self.assertEqual(len(vms_ics1), 0)
+
+        total_perf = sum(
+            self.system.perfs[c.vm.ic, c.cc] * sol.alloc.containers[c]
+            for c in sol.alloc.containers
+            if sol.alloc.containers[c]
+        )
+        self.assertLessEqual(
+            workload.num_reqs.magnitude,
+            total_perf.to(RequestsPerTime("req/s")).magnitude,
+        )
+
+    def test_perf6_greedy(self):
+        reqs = 6
+        _, sol = self.__solve_greedy(reqs)
+
+        SolutionPrettyPrinter(sol).print()
+
+        self.assertEqual(sol.solving_stats.status, Status.INFEASIBLE)
 
 
 class Test2apps(unittest.TestCase):
@@ -508,6 +636,32 @@ class Test2apps(unittest.TestCase):
 
         self.assertAlmostEqual(sol.cost, Currency("0.8/3600 usd"))
         self.assertEqual(sum(sol.alloc.vms.values()), 1)
+        self.assertEqual(sum(sol.alloc.containers.values()), 4)
+
+    def test_2apps_greedy(self):
+        self.__set_up()
+
+        app0 = self.system.apps[0]
+        app1 = self.system.apps[1]
+        workloads = {
+            app0: Workload(
+                num_reqs=Requests("5 req"), time_slot_size=Time("s"), app=app0
+            ),
+            app1: Workload(
+                num_reqs=Requests("10 req"), time_slot_size=Time("s"), app=app1
+            ),
+        }
+        problem = Problem(
+            system=self.system, workloads=workloads, sched_time_size=Time("s")
+        )
+
+        ProblemPrettyPrinter(problem).print()
+
+        alloc = GreedyAllocator(problem)
+        sol = alloc.solve()
+
+        self.assertAlmostEqual(sol.cost, Currency("0.8/3600 usd"))
+        self.assertEqual(sum(sol.alloc.vms.values()), 4)
         self.assertEqual(sum(sol.alloc.containers.values()), 4)
 
 

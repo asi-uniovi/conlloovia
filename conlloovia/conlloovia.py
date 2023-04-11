@@ -40,6 +40,7 @@ from .model import (
     Vm,
     Container,
     Solution,
+    RequestsPerTime,
     Status,
     SolvingStats,
 )
@@ -82,9 +83,9 @@ class ConllooviaAllocator:
 
         self.container_names: list[str] = []
         self.containers: dict[str, Container] = {}
-        self.container_performances: dict[str, float] = {}
-        self.container_names_per_app: dict[App, list[Container]] = {}
-        self.container_names_per_vm: dict[Vm, list[Container]] = {}
+        self.container_performances: dict[str, RequestsPerTime] = {}
+        self.container_names_per_app: dict[App, list[str]] = {}
+        self.container_names_per_vm: dict[Vm, list[str]] = {}
 
         for app in self.problem.system.apps:
             self.container_names_per_app[app] = []

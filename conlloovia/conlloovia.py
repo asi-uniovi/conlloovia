@@ -309,17 +309,16 @@ class GreedyAllocator:
             problem: problem to solve"""
         self.problem = problem
 
-        self.vms: dict[str, Vm] = {}
-        self.containers: dict[str, Container] = {}
-
         start_creation = time.perf_counter()
 
-        self.create_vms_and_containers()
+        self.vms: dict[str, Vm] = {}
+        self.containers: dict[str, Container] = {}
+        self._create_vms_and_containers()
 
-        # Precalculate the cheapest instance class in terms of cores per dollar.
+        # Precompute the cheapest instance class in terms of cores per dollar.
         # If there are several, select the one with the smallest number of
         # cores.
-        self.cheapest_ic = self.compute_cheapest_ic()
+        self.cheapest_ic = self._compute_cheapest_ic()
         self.cheapest_vms = [
             vm for vm in self.vms.values() if vm.ic == self.cheapest_ic
         ]
@@ -333,7 +332,7 @@ class GreedyAllocator:
         end_creation = time.perf_counter()
         self.creation_time = end_creation - start_creation
 
-    def compute_cheapest_ic(self):
+    def _compute_cheapest_ic(self):
         """Returns the cheapest instance class in terms of cores per dollar.
         If there are several, select the one with the smallest number of
         cores."""
@@ -345,7 +344,8 @@ class GreedyAllocator:
             ),
         )
 
-    def create_vms_and_containers(self) -> None:
+    def _create_vms_and_containers(self) -> None:
+        """Creates the VMs and containers."""
         for ic in self.problem.system.ics:
             for i in range(ic.limit):
                 new_vm_name = f"{ic.name}-{i}"
@@ -357,7 +357,7 @@ class GreedyAllocator:
                     new_container = Container(cc=cc, vm=new_vm)
                     self.containers[new_container_name] = new_container
 
-    def compute_num_ccs_per_app(self) -> Dict[App, int]:
+    def _compute_num_ccs_per_app(self) -> Dict[App, int]:
         """Computes the number of CCs needed for each app according to its
         workload."""
         num_ccs = {}
@@ -372,12 +372,12 @@ class GreedyAllocator:
 
         return num_ccs
 
-    def create_infeasible_solution(self, start_solving: float) -> Solution:
+    def _create_infeasible_solution(self, start_solving: float) -> Solution:
         """Creates an infeasible solution. The parameter start_solving is the
         time when the solving started."""
         alloc = Allocation(
-            vms=self.create_initial_vm_alloc(),
-            containers=self.create_initial_container_alloc(),
+            vms=self._create_initial_vm_alloc(),
+            containers=self._create_initial_container_alloc(),
         )
 
         sol = Solution(
@@ -396,7 +396,7 @@ class GreedyAllocator:
 
         return sol
 
-    def create_initial_vm_alloc(self) -> Dict[Vm, bool]:
+    def _create_initial_vm_alloc(self) -> Dict[Vm, bool]:
         """Creates an initial VM allocation where no VM is allocated."""
         vm_alloc: Dict[Vm, bool] = {}
         for vm in self.vms.values():
@@ -404,7 +404,7 @@ class GreedyAllocator:
 
         return vm_alloc
 
-    def create_initial_container_alloc(self) -> Dict[Container, int]:
+    def _create_initial_container_alloc(self) -> Dict[Container, int]:
         """Creates an initial container allocation where no container is
         allocated."""
         container_alloc: Dict[Container, int] = {}
@@ -424,20 +424,20 @@ class GreedyAllocator:
 
         # Compute the number of CCs needed for each app according to its
         # workload
-        num_ccs_per_app = self.compute_num_ccs_per_app()
+        num_ccs_per_app = self._compute_num_ccs_per_app()
 
         # Initialize the VM alloc to 0 for all VMs
-        vm_alloc = self.create_initial_vm_alloc()
+        vm_alloc = self._create_initial_vm_alloc()
 
         # Initialize the container alloc to 0 for all containers
-        container_alloc = self.create_initial_container_alloc()
+        container_alloc = self._create_initial_container_alloc()
 
         # Compute the number of VMs needed in total. Start assigning CCs and
-        # when the number of cores of the VM exceeds the number of cores of the
-        # cheapest instance class, create a new VM. Create the allocation and
-        # compute the cost at the same time.
-        num_vms = 0
-        num_cores = ComputationalUnits("0 cores")  # Number of used cores of this VM
+        # when the number of cores (or memory) of the VM exceeds the number of
+        # cores (or memory) of the cheapest instance class, create a new VM.
+        # Create the allocation and compute the cost at the same time.
+        num_vms = 0  # Number of VMs used
+        cores = ComputationalUnits("0 cores")  # Number of used cores of this VM
         mem = Storage("0 bytes")  # Memory used by this VM
         current_vm = None
         cost = Currency("0 usd")
@@ -455,48 +455,43 @@ class GreedyAllocator:
                     "  Not enough cores for containers of app %s in the cheapest VM",
                     app.name,
                 )
-                return self.create_infeasible_solution(start_solving)
+                return self._create_infeasible_solution(start_solving)
 
             if cc.mem > self.cheapest_ic.mem:
                 logging.info(
                     "  Not enough memory for containers of app %s in the cheapest VM",
                     app.name,
                 )
-                return self.create_infeasible_solution(start_solving)
+                return self._create_infeasible_solution(start_solving)
 
             for _ in range(num_ccs_per_app[app]):
-                new_num_cores = num_cores + cc.cores
+                new_cores = cores + cc.cores
                 new_mem = mem + cc.mem
 
-                if (
-                    current_vm is None
-                    or new_num_cores > current_vm.ic.cores
-                    or new_mem > current_vm.ic.mem
-                ):
-                    # We need a new VM
+                if self._is_new_vm_needed(current_vm, new_cores, new_mem):
                     if num_vms == len(self.cheapest_vms):
                         logging.info("  Not enough VMs")
-                        return self.create_infeasible_solution(start_solving)
+                        return self._create_infeasible_solution(start_solving)
 
                     current_vm = self.cheapest_vms[num_vms]
                     cost += current_vm.ic.price * self.problem.sched_time_size
                     vm_alloc[current_vm] = True
 
                     num_vms += 1
-                    num_cores = ComputationalUnits("0 cores")
+                    cores = ComputationalUnits("0 cores")
                     mem = Storage("0 bytes")
 
                     logging.info(
                         "  Using %i/%i VMs (%s)", num_vms, len(self.cheapest_vms), cost
                     )
 
-                num_cores = num_cores + cc.cores
+                cores = cores + cc.cores
                 mem = mem + cc.mem
                 logging.info(
                     "    Using %s of VM %i (total of %s/%s, %s/%s)",
                     cc.cores,
                     num_vms - 1,
-                    num_cores,
+                    cores,
                     current_vm.ic.cores,
                     mem.to("GiB"),
                     current_vm.ic.mem,
@@ -516,7 +511,7 @@ class GreedyAllocator:
 
                     # Another possibility would be to try to use the next CC and
                     # so on, but it's not worth it.
-                    return self.create_infeasible_solution(start_solving)
+                    return self._create_infeasible_solution(start_solving)
 
         # Create the allocation
         alloc = Allocation(
@@ -541,6 +536,17 @@ class GreedyAllocator:
         )
 
         return sol
+
+    def _is_new_vm_needed(self, current_vm, new_cores, new_mem):
+        """Checks if a new VM is needed. This will happen if the current VM is
+        None (i.e., we are allocating the first CC) or if the new number of
+        cores or memory exceeds the number of cores or memory of the current
+        VM."""
+        return (
+            current_vm is None
+            or new_cores > current_vm.ic.cores
+            or new_mem > current_vm.ic.mem
+        )
 
 
 # pylint: disable = E, W, R, C

@@ -29,7 +29,7 @@ from pulp import (
 )
 from pulp.constants import LpBinary, LpInteger  # type: ignore
 
-from cloudmodel.unified.units import Currency
+from cloudmodel.unified.units import Currency, ComputationalUnits, Storage
 
 from .model import (
     Problem,
@@ -437,7 +437,8 @@ class GreedyAllocator:
         # cheapest instance class, create a new VM. Create the allocation and
         # compute the cost at the same time.
         num_vms = 0
-        num_cores = 0  # Number of used cores of this VM
+        num_cores = ComputationalUnits("0 cores")  # Number of used cores of this VM
+        mem = Storage("0 bytes")  # Memory used by this VM
         current_vm = None
         cost = Currency("0 usd")
         for app in self.problem.system.apps:
@@ -456,10 +457,22 @@ class GreedyAllocator:
                 )
                 return self.create_infeasible_solution(start_solving)
 
+            if cc.mem > self.cheapest_ic.mem:
+                logging.info(
+                    "  Not enough memory for containers of app %s in the cheapest VM",
+                    app.name,
+                )
+                return self.create_infeasible_solution(start_solving)
+
             for _ in range(num_ccs_per_app[app]):
                 new_num_cores = num_cores + cc.cores
+                new_mem = mem + cc.mem
 
-                if current_vm is None or new_num_cores > current_vm.ic.cores:
+                if (
+                    current_vm is None
+                    or new_num_cores > current_vm.ic.cores
+                    or new_mem > current_vm.ic.mem
+                ):
                     # We need a new VM
                     if num_vms == len(self.cheapest_vms):
                         logging.info("  Not enough VMs")
@@ -470,19 +483,23 @@ class GreedyAllocator:
                     vm_alloc[current_vm] = True
 
                     num_vms += 1
-                    num_cores = 0
+                    num_cores = ComputationalUnits("0 cores")
+                    mem = Storage("0 bytes")
 
                     logging.info(
                         "  Using %i/%i VMs (%s)", num_vms, len(self.cheapest_vms), cost
                     )
 
-                num_cores += cc.cores
+                num_cores = num_cores + cc.cores
+                mem = mem + cc.mem
                 logging.info(
-                    "    Using %s of VM %i (total of %s/%s)",
+                    "    Using %s of VM %i (total of %s/%s, %s/%s)",
                     cc.cores,
                     num_vms - 1,
                     num_cores,
                     current_vm.ic.cores,
+                    mem.to("GiB"),
+                    current_vm.ic.mem,
                 )
 
                 container = self.containers[
@@ -497,8 +514,8 @@ class GreedyAllocator:
                         current_vm.num,
                     )
 
-                    # Another possibility would be to try to use the next CC
-                    # and so on, but it's not worth it.
+                    # Another possibility would be to try to use the next CC and
+                    # so on, but it's not worth it.
                     return self.create_infeasible_solution(start_solving)
 
         # Create the allocation

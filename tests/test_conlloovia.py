@@ -717,3 +717,74 @@ class TestInfeasible(unittest.TestCase):
         sol = alloc.solve()
 
         self.assertEqual(sol.solving_stats.status, Status.INFEASIBLE)
+
+
+class TestGreedyMem(unittest.TestCase):
+    """Test that the greedy allocator respects memory constraints."""
+
+    def __set_up(self):
+        apps = [
+            App(name="app0"),
+        ]
+
+        ics = [
+            InstanceClass(
+                name="2c8g",
+                price=CurrencyPerTime("0.2 usd/hour"),
+                cores=ComputationalUnits("2 cores"),
+                mem=Storage("8 gibibytes"),
+                limit=5,
+            ),
+            InstanceClass(
+                name="4c16g",
+                price=CurrencyPerTime("0.4 usd/hour"),
+                cores=ComputationalUnits("4 cores"),
+                mem=Storage("16 gibibytes"),
+                limit=5,
+            ),
+        ]
+
+        ccs = [
+            ContainerClass(
+                name="1c8g",
+                cores=ComputationalUnits("1 cores"),
+                mem=Storage("8 gibibytes"),
+                app=apps[0],
+                limit=10,
+            ),
+        ]
+
+        base_perf = RequestsPerTime("1 req/s")
+        perfs = {
+            (ics[0], ccs[0]): base_perf,
+            (ics[1], ccs[0]): base_perf * 1.2,
+        }
+
+        self.system = System(apps=apps, ics=ics, ccs=ccs, perfs=perfs)
+
+    def test_greedy_mem(self):
+        """Two containers will be needed. Even though one 2c8g has enough cores
+        for the two containers, two VMs are needed because of the memory."""
+        self.__set_up()
+
+        app = self.system.apps[0]
+        workload = Workload(
+            num_reqs=Requests("2 req"), time_slot_size=Time("s"), app=app
+        )
+        workloads = {app: workload}
+        problem = Problem(
+            system=self.system, workloads=workloads, sched_time_size=Time("s")
+        )
+
+        ProblemPrettyPrinter(problem).print()
+
+        alloc = GreedyAllocator(problem)
+
+        # Check that the cheapest ic is ics[0]
+        self.assertEqual(alloc.compute_cheapest_ic(), self.system.ics[0])
+
+        sol = alloc.solve()
+
+        self.assertEqual(sum(sol.alloc.vms.values()), 2)
+        self.assertEqual(sum(sol.alloc.containers.values()), 2)
+        self.assertEqual(sol.cost, Currency("2*0.2/3600 usd"))

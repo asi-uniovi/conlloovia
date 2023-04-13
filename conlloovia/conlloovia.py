@@ -8,7 +8,7 @@ import math
 import logging
 import os
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import pulp  # type: ignore
 
@@ -298,9 +298,27 @@ class ConllooviaAllocator:
         logging.info("Solving stats: %s", solving_stats)
 
 
+class GreedyAllocatorState:
+    """State of the GreedyAllocator while building a solution."""
+
+    def __init__(self, vm_alloc, container_alloc) -> None:
+        """Constructor."""
+        self.start_solving = time.perf_counter()
+        self.vm_alloc = vm_alloc
+        self.container_alloc = container_alloc
+        self.num_vms = 0  # Number of VMs used
+        self.cores = ComputationalUnits("0 cores")  # Number of used cores of this VM
+        self.mem = Storage("0 bytes")  # Memory used by this VM
+        self.current_vm: Optional[Vm] = None
+        self.cost = Currency("0 usd")
+        self.no_alloc_found = False  # If no allocation is found, it will be changed
+
+
 class GreedyAllocator:
-    """Greedy allocator that selects the cheapest instance class (in terms of
-    cores per dollar) and the smallest container class (in terms of cores)."""
+    """Greedy allocator that only uses one instance class, and one container
+    class for each application. It selects the cheapest instance class (in terms
+    of cores per dollar) and the smallest container class (in terms of cores)
+    for each application."""
 
     def __init__(self, problem: Problem) -> None:
         """Constructor.
@@ -311,8 +329,8 @@ class GreedyAllocator:
 
         start_creation = time.perf_counter()
 
-        self.vms: dict[str, Vm] = self._create_vms()
-        self.containers: dict[str, Container] = self._create_containers()
+        self.vms: dict[str, Vm] = self._create_vms_dict()
+        self.containers: dict[str, Container] = self._create_containers_dict()
 
         # Precompute the cheapest instance class and the VMs of that IC
         self.cheapest_ic = self._compute_cheapest_ic()
@@ -332,116 +350,143 @@ class GreedyAllocator:
     def solve(self) -> Solution:
         """Solves the problem using a Greedy algorithm.
 
+        It computes the number of VMs needed in total. It starts assigning CCs
+        and when the number of cores (or memory) of the VM exceeds the number of
+        cores (or memory) of the cheapest instance class, it creates a new VM.
+        Iit creates the allocation and computes the cost at the same time. The
+        current state of the greedy allocator is stored in the state variable.
+        The final state will be used to create the solution.
+
         Returns:
             solution to the problem
         """
+        state = GreedyAllocatorState(
+            vm_alloc=self._create_empty_vm_alloc(),
+            container_alloc=self._create_empty_container_alloc(),
+        )
 
-        start_solving = time.perf_counter()
-
-        # Compute the number of CCs needed for each app according to its
-        # workload
-        num_ccs_per_app = self._compute_num_ccs_per_app()
-
-        # Initialize the VM alloc to 0 for all VMs
-        vm_alloc = self._create_initial_vm_alloc()
-
-        # Initialize the container alloc to 0 for all containers
-        container_alloc = self._create_initial_container_alloc()
-
-        # Compute the number of VMs needed in total. Start assigning CCs and
-        # when the number of cores (or memory) of the VM exceeds the number of
-        # cores (or memory) of the cheapest instance class, create a new VM.
-        # Create the allocation and compute the cost at the same time.
-        num_vms = 0  # Number of VMs used
-        cores = ComputationalUnits("0 cores")  # Number of used cores of this VM
-        mem = Storage("0 bytes")  # Memory used by this VM
-        current_vm = None
-        cost = Currency("0 usd")
         for app in self.problem.system.apps:
-            cc = self.smallest_ccs_per_app[app]
+            self._allocate_ccs_for_app(app, state)
+
+            if state.no_alloc_found:
+                break
+
+        return self._create_sol_from_state(state)
+
+    def _allocate_ccs_for_app(self, app: App, state: GreedyAllocatorState) -> None:
+        """Allocates the container classes for the given app, updating the
+        state."""
+        cc = self.smallest_ccs_per_app[app]
+        num_ccs = self._compute_num_ccs_for_app(app)
+
+        logging.info("Allocating %i %s CCs for app %s", num_ccs, cc.name, app.name)
+
+        if cc.cores > self.cheapest_ic.cores:
             logging.info(
-                "Allocating %i %s CCs for app %s",
-                num_ccs_per_app[app],
-                cc.name,
+                "  Not enough cores for containers of app %s in the cheapest VM",
                 app.name,
             )
+            state.no_alloc_found = True
+            return
 
-            if cc.cores > self.cheapest_ic.cores:
-                logging.info(
-                    "  Not enough cores for containers of app %s in the cheapest VM",
-                    app.name,
-                )
-                return self._create_infeasible_solution(start_solving)
+        if cc.mem > self.cheapest_ic.mem:
+            logging.info(
+                "  Not enough memory for containers of app %s in the cheapest VM",
+                app.name,
+            )
+            state.no_alloc_found = True
+            return
 
-            if cc.mem > self.cheapest_ic.mem:
-                logging.info(
-                    "  Not enough memory for containers of app %s in the cheapest VM",
-                    app.name,
-                )
-                return self._create_infeasible_solution(start_solving)
+        for _ in range(num_ccs):
+            self._allocate_cc(cc, state)
+            if state.no_alloc_found:
+                return
 
-            for _ in range(num_ccs_per_app[app]):
-                new_cores = cores + cc.cores
-                new_mem = mem + cc.mem
+    def _allocate_cc(self, cc: ContainerClass, state: GreedyAllocatorState) -> None:
+        """Allocates a container class replica, updating the state."""
+        new_cores = state.cores + cc.cores
+        new_mem = state.mem + cc.mem
 
-                if self._is_new_vm_needed(current_vm, new_cores, new_mem):
-                    if num_vms == len(self.cheapest_vms):
-                        logging.info("  Not enough VMs")
-                        return self._create_infeasible_solution(start_solving)
+        if self._is_new_vm_needed(state.current_vm, new_cores, new_mem):
+            if state.num_vms == len(self.cheapest_vms):
+                logging.info("  Not enough VMs")
+                state.no_alloc_found = True
+                return
 
-                    current_vm = self.cheapest_vms[num_vms]
-                    cost += current_vm.ic.price * self.problem.sched_time_size
-                    vm_alloc[current_vm] = True
+            self._create_new_vm(state)
 
-                    num_vms += 1
-                    cores = ComputationalUnits("0 cores")
-                    mem = Storage("0 bytes")
+        assert state.current_vm is not None  # for mypy
 
-                    logging.info(
-                        "  Using %i/%i VMs (%s)", num_vms, len(self.cheapest_vms), cost
-                    )
-
-                cores = cores + cc.cores
-                mem = mem + cc.mem
-                logging.info(
-                    "    Using %s of VM %i (total of %s/%s, %s/%s)",
-                    cc.cores,
-                    num_vms - 1,
-                    cores,
-                    current_vm.ic.cores,
-                    mem.to("GiB"),
-                    current_vm.ic.mem,
-                )
-
-                container = self.containers[
-                    f"{current_vm.ic.name}-{current_vm.num}-{cc.name}"
-                ]
-                container_alloc[container] += 1
-                if container_alloc[container] > cc.limit:
-                    logging.info(
-                        "  Not enough containers of class %s in VM %s-%i",
-                        cc.name,
-                        current_vm.ic.name,
-                        current_vm.num,
-                    )
-
-                    # Another possibility would be to try to use the next CC and
-                    # so on, but it's not worth it.
-                    return self._create_infeasible_solution(start_solving)
-
-        # Create the allocation
-        alloc = Allocation(
-            vms=vm_alloc,
-            containers=container_alloc,
+        state.cores = state.cores + cc.cores
+        state.mem = state.mem + cc.mem
+        logging.info(
+            "    Using %s of VM %i (total of %s/%s, %s/%s)",
+            cc.cores,
+            state.num_vms - 1,
+            state.cores,
+            state.current_vm.ic.cores,
+            state.mem.to("GiB"),
+            state.current_vm.ic.mem,
         )
+
+        container = self.containers[
+            f"{state.current_vm.ic.name}-{state.current_vm.num}-{cc.name}"
+        ]
+        state.container_alloc[container] += 1
+        if state.container_alloc[container] > cc.limit:
+            logging.info(
+                "  Not enough containers of class %s in VM %s-%i",
+                cc.name,
+                state.current_vm.ic.name,
+                state.current_vm.num,
+            )
+            state.no_alloc_found = True
+            return
+
+    def _create_new_vm(self, state: GreedyAllocatorState) -> None:
+        """Creates a new VM, updating the state."""
+        state.current_vm = self.cheapest_vms[state.num_vms]
+        state.cost += state.current_vm.ic.price * self.problem.sched_time_size
+        state.vm_alloc[state.current_vm] = True
+
+        state.num_vms += 1
+        state.cores = ComputationalUnits("0 cores")
+        state.mem = Storage("0 bytes")
+
+        logging.info(
+            "  Using %i/%i VMs (%s)",
+            state.num_vms,
+            len(self.cheapest_vms),
+            state.cost,
+        )
+
+    def _create_sol_from_state(self, state: GreedyAllocatorState) -> Solution:
+        """Creates the solution from the state, which is supposed to be the
+        state after the allocation has been created."""
+        if state.no_alloc_found:
+            # Empty alloc
+            alloc = Allocation(
+                vms=self._create_empty_vm_alloc(),
+                containers=self._create_empty_container_alloc(),
+            )
+            status = Status.INFEASIBLE
+            cost = Currency("0 usd")
+        else:
+            # Final alloc
+            alloc = Allocation(
+                vms=state.vm_alloc,
+                containers=state.container_alloc,
+            )
+            status = Status.INTEGER_FEASIBLE
+            cost = state.cost
 
         solving_stats = SolvingStats(
             frac_gap=0,
             max_seconds=0,
             lower_bound=0,
             creation_time=self.creation_time,
-            solving_time=time.perf_counter() - start_solving,
-            status=Status.INTEGER_FEASIBLE,
+            solving_time=time.perf_counter() - state.start_solving,
+            status=status,
         )
 
         sol = Solution(
@@ -453,8 +498,8 @@ class GreedyAllocator:
 
         return sol
 
-    def _create_vms(self) -> Dict[str, Vm]:
-        """Creates the VMs."""
+    def _create_vms_dict(self) -> Dict[str, Vm]:
+        """Creates a dictionary of VMs, indexed by their name."""
         vms = {}
         for ic in self.problem.system.ics:
             for i in range(ic.limit):
@@ -464,8 +509,9 @@ class GreedyAllocator:
 
         return vms
 
-    def _create_containers(self) -> Dict[str, Container]:
-        """Creates the containers."""
+    def _create_containers_dict(self) -> Dict[str, Container]:
+        """Creates a dictionary of containers, indexed by their name. It assumes
+        that the VMs have already been created."""
         containers = {}
         for i, vm in enumerate(self.vms.values()):
             for cc in self.problem.system.ccs:
@@ -486,60 +532,25 @@ class GreedyAllocator:
             ),
         )
 
-    def _compute_num_ccs_per_app(self) -> Dict[App, int]:
-        """Computes the number of CCs needed for each app according to its
-        workload."""
-        num_ccs = {}
-        for app in self.problem.system.apps:
-            num_ccs[app] = self._compute_num_ccs_for_app(app)
-
-        return num_ccs
-
     def _compute_num_ccs_for_app(self, app) -> int:
         """Computes the number of CCs needed for the given app according to
         its workload."""
         cc = self.smallest_ccs_per_app[app]
         cc_perf = self.problem.system.perfs[self.cheapest_ic, cc]
         cc_reqs_in_sched_ts = cc_perf * self.problem.sched_time_size
+        wl_reqs = self.problem.workloads[app].num_reqs
+        return math.ceil(wl_reqs / cc_reqs_in_sched_ts)
 
-        num = math.ceil(self.problem.workloads[app].num_reqs / cc_reqs_in_sched_ts)
-
-        return num
-
-    def _create_infeasible_solution(self, start_solving: float) -> Solution:
-        """Creates an infeasible solution. The parameter start_solving is the
-        time when the solving started."""
-        alloc = Allocation(
-            vms=self._create_initial_vm_alloc(),
-            containers=self._create_initial_container_alloc(),
-        )
-
-        sol = Solution(
-            problem=self.problem,
-            alloc=alloc,
-            cost=Currency("0 usd"),
-            solving_stats=SolvingStats(
-                frac_gap=0,
-                max_seconds=0,
-                lower_bound=0,
-                creation_time=self.creation_time,
-                solving_time=time.perf_counter() - start_solving,
-                status=Status.INFEASIBLE,
-            ),
-        )
-
-        return sol
-
-    def _create_initial_vm_alloc(self) -> Dict[Vm, bool]:
-        """Creates an initial VM allocation where no VM is allocated."""
+    def _create_empty_vm_alloc(self) -> Dict[Vm, bool]:
+        """Creates a VM allocation where no VM is allocated."""
         vm_alloc: Dict[Vm, bool] = {}
         for vm in self.vms.values():
             vm_alloc[vm] = False
 
         return vm_alloc
 
-    def _create_initial_container_alloc(self) -> Dict[Container, int]:
-        """Creates an initial container allocation where no container is
+    def _create_empty_container_alloc(self) -> Dict[Container, int]:
+        """Creates a container allocation where no container is
         allocated."""
         container_alloc: Dict[Container, int] = {}
         for container in self.containers.values():
@@ -547,7 +558,9 @@ class GreedyAllocator:
 
         return container_alloc
 
-    def _is_new_vm_needed(self, current_vm, new_cores, new_mem) -> bool:
+    def _is_new_vm_needed(
+        self, current_vm: Optional[Vm], new_cores: ComputationalUnits, new_mem: Storage
+    ) -> bool:
         """Checks if a new VM is needed. This will happen if the current VM is
         None (i.e., we are allocating the first CC) or if the new number of
         cores or memory exceeds the number of cores or memory of the current

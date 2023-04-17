@@ -26,15 +26,23 @@ class GreedyAllocatorState:
     """State of the GreedyAllocator while building a solution."""
 
     def __init__(self, vm_alloc, container_alloc) -> None:
-        """Constructor."""
+        """Constructor. It assumes that the solving time starts when an object
+        of this class is created. The vm_alloc and the container_alloc contain
+        the allocation as it is being built. The current_vm is the VM that is
+        is currently being filled with containers.
+
+        If the final state is reached an no allocation is found, the
+        no_alloc_found variable will be set to True."""
         self.start_solving = time.perf_counter()
         self.vm_alloc = vm_alloc
         self.container_alloc = container_alloc
         self.num_vms = 0  # Number of VMs used
-        self.cores = ComputationalUnits("0 cores")  # Number of used cores of this VM
-        self.mem = Storage("0 bytes")  # Memory used by this VM
         self.current_vm: Optional[Vm] = None
-        self.cost = Currency("0 usd")
+        self.cores = ComputationalUnits(
+            "0 cores"
+        )  # Number of used cores in the current VM
+        self.mem = Storage("0 bytes")  # Memory used in the current VM
+        self.cost = Currency("0 usd")  # Cost of the allocation so far
         self.no_alloc_found = False  # If no allocation is found, it will be changed
 
 

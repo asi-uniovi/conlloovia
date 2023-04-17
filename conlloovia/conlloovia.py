@@ -513,9 +513,9 @@ class GreedyAllocator:
         """Creates a dictionary of containers, indexed by their name. It assumes
         that the VMs have already been created."""
         containers = {}
-        for i, vm in enumerate(self.vms.values()):
+        for vm in self.vms.values():
             for cc in self.problem.system.ccs:
-                new_container_name = f"{vm.ic.name}-{i}-{cc.name}"
+                new_container_name = f"{vm.ic.name}-{vm.num}-{cc.name}"
                 containers[new_container_name] = Container(cc=cc, vm=vm)
 
         return containers

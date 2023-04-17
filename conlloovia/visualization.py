@@ -3,7 +3,7 @@ conlloovia."""
 
 from rich.console import Console
 from rich.table import Table, Column
-from rich import print
+from rich import print  # pylint: disable=redefined-builtin
 
 from .model import Solution, Status, Problem
 

@@ -20,6 +20,7 @@ from .model import (
     Status,
     SolvingStats,
 )
+from .problem_helper import ProblemHelper
 
 
 class GreedyAllocatorState:
@@ -59,13 +60,15 @@ class GreedyAllocator:
             problem: problem to solve"""
         self.problem = problem
 
+        helper = ProblemHelper(problem)
+
         start_creation = time.perf_counter()
 
-        self.vms: dict[str, Vm] = self._create_vms_dict()
-        self.containers: dict[str, Container] = self._create_containers_dict()
+        self.vms: dict[str, Vm] = helper.create_vms_dict()
+        self.containers: dict[str, Container] = helper.create_containers_dict(self.vms)
 
         # Precompute the cheapest instance class and the VMs of that IC
-        self.cheapest_ic = self._compute_cheapest_ic()
+        self.cheapest_ic = helper.compute_cheapest_ic()
         self.cheapest_vms = [
             vm for vm in self.vms.values() if vm.ic == self.cheapest_ic
         ]
@@ -85,7 +88,7 @@ class GreedyAllocator:
         It computes the number of VMs needed in total. It starts assigning CCs
         and when the number of cores (or memory) of the VM exceeds the number of
         cores (or memory) of the cheapest instance class, it creates a new VM.
-        Iit creates the allocation and computes the cost at the same time. The
+        It creates the allocation and computes the cost at the same time. The
         current state of the greedy allocator is stored in the state variable.
         The final state will be used to create the solution.
 
@@ -229,40 +232,6 @@ class GreedyAllocator:
         )
 
         return sol
-
-    def _create_vms_dict(self) -> Dict[str, Vm]:
-        """Creates a dictionary of VMs, indexed by their name."""
-        vms = {}
-        for ic in self.problem.system.ics:
-            for vm_num in range(ic.limit):
-                new_vm_name = f"{ic.name}-{vm_num}"
-                new_vm = Vm(ic=ic, num=vm_num)
-                vms[new_vm_name] = new_vm
-
-        return vms
-
-    def _create_containers_dict(self) -> Dict[str, Container]:
-        """Creates a dictionary of containers, indexed by their name. It assumes
-        that the VMs have already been created."""
-        containers = {}
-        for vm in self.vms.values():
-            for cc in self.problem.system.ccs:
-                new_container_name = f"{vm.ic.name}-{vm.num}-{cc.name}"
-                containers[new_container_name] = Container(cc=cc, vm=vm)
-
-        return containers
-
-    def _compute_cheapest_ic(self):
-        """Returns the cheapest instance class in terms of cores per dollar.
-        If there are several, select the one with the smallest number of
-        cores."""
-        return min(
-            self.problem.system.ics,
-            key=lambda ic: (
-                ic.price.to("usd/h") / ic.cores,
-                ic.cores,
-            ),
-        )
 
     def _compute_num_ccs_for_app(self, app) -> int:
         """Computes the number of CCs needed for the given app according to

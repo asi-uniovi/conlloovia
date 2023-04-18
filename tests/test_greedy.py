@@ -68,9 +68,6 @@ class TestSystem2ic2cc:
 
         alloc = GreedyAllocator(problem)
 
-        # Check that the cheapest ic is ics[0]
-        assertions.assertEqual(alloc._compute_cheapest_ic(), system.ics[0])
-
         sol = alloc.solve()
         return workload, sol
 
@@ -262,9 +259,6 @@ class TestGreedyMem(unittest.TestCase):
         ProblemPrettyPrinter(problem).print()
 
         alloc = GreedyAllocator(problem)
-
-        # Check that the cheapest ic is ics[0]
-        assertions.assertEqual(alloc._compute_cheapest_ic(), system.ics[0])
 
         sol = alloc.solve()
 

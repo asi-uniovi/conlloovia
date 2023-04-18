@@ -31,7 +31,7 @@ assertions = unittest.TestCase("__init__")
 class TestSystem1ic1cc:
     """Basic tests with only one instance class and one container class."""
 
-    def test_only_one_greedy(self, system_1ic_1cc_1app):
+    def test_only_one_greedy(self, system_1ic_1cc_1app) -> None:
         """Tests that only one VM and container is required, using the greedy
         allocator."""
         system = system_1ic_1cc_1app
@@ -71,7 +71,7 @@ class TestSystem2ic2cc:
         sol = alloc.solve()
         return workload, sol
 
-    def test_perf1_greedy(self, system_2ic_2cc_1app):
+    def test_perf1_greedy(self, system_2ic_2cc_1app) -> None:
         """Tests that only one VM from ics0 is required."""
         system = system_2ic_2cc_1app
         workload, sol = self.__solve_greedy(system, reqs=1)
@@ -101,7 +101,7 @@ class TestSystem2ic2cc:
             total_perf.to(RequestsPerTime("req/s")).magnitude,
         )
 
-    def test_perf4_greedy(self, system_2ic_2cc_1app):
+    def test_perf4_greedy(self, system_2ic_2cc_1app) -> None:
         """Tests that 4 VMs of ics0 are required."""
         system = system_2ic_2cc_1app
         workload, sol = self.__solve_greedy(system, reqs=4)
@@ -131,7 +131,7 @@ class TestSystem2ic2cc:
             total_perf.to(RequestsPerTime("req/s")).magnitude,
         )
 
-    def test_perf5_greedy(self, system_2ic_2cc_1app):
+    def test_perf5_greedy(self, system_2ic_2cc_1app) -> None:
         """Tests that 5 VMs of ics0 are required."""
         system = system_2ic_2cc_1app
         workload, sol = self.__solve_greedy(system, reqs=5)
@@ -161,7 +161,7 @@ class TestSystem2ic2cc:
             total_perf.to(RequestsPerTime("req/s")).magnitude,
         )
 
-    def test_perf6_greedy(self, system_2ic_2cc_1app):
+    def test_perf6_greedy(self, system_2ic_2cc_1app) -> None:
         """Test that the problem is infeasible."""
         system = system_2ic_2cc_1app
         _, sol = self.__solve_greedy(system, reqs=6)
@@ -174,7 +174,7 @@ class TestSystem2ic2cc:
 class Test2apps:
     """Tests for the greedy allocator with 2 apps."""
 
-    def test_2apps_greedy(self, system_2apps):
+    def test_2apps_greedy(self, system_2apps) -> None:
         """Test that the greedy allocator works with 2 apps."""
         system = system_2apps
 
@@ -203,13 +203,11 @@ class Test2apps:
 class TestGreedyMem(unittest.TestCase):
     """Test that the greedy allocator respects memory constraints."""
 
-    def __set_up(self):
+    def __set_up(self) -> System:
         """Creates a system with 2 instance classes and 1 container class."""
-        apps = [
-            App(name="app0"),
-        ]
+        apps = (App(name="app0"),)
 
-        ics = [
+        ics = (
             InstanceClass(
                 name="2c8g",
                 price=CurrencyPerTime("0.2 usd/hour"),
@@ -224,9 +222,9 @@ class TestGreedyMem(unittest.TestCase):
                 mem=Storage("16 gibibytes"),
                 limit=5,
             ),
-        ]
+        )
 
-        ccs = [
+        ccs = (
             ContainerClass(
                 name="1c8g",
                 cores=ComputationalUnits("1 cores"),
@@ -234,7 +232,7 @@ class TestGreedyMem(unittest.TestCase):
                 app=apps[0],
                 limit=10,
             ),
-        ]
+        )
 
         base_perf = RequestsPerTime("1 req/s")
         perfs = {
@@ -244,7 +242,7 @@ class TestGreedyMem(unittest.TestCase):
 
         return System(apps=apps, ics=ics, ccs=ccs, perfs=perfs)
 
-    def test_greedy_mem(self):
+    def test_greedy_mem(self) -> None:
         """Two containers will be needed. Even though one 2c8g has enough cores
         for the two containers, two VMs are needed because of the memory."""
         system = self.__set_up()

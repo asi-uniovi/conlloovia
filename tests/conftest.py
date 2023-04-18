@@ -20,11 +20,9 @@ from conlloovia.model import (
 @pytest.fixture(scope="module")
 def system_1ic_1cc_1app() -> System:
     """Sets up a system with 1 instance class, 1 container class and 1 app."""
-    apps = [
-        App(name="app0"),
-    ]
+    apps = (App(name="app0"),)
 
-    ics = [
+    ics = (
         InstanceClass(
             name="m5.xlarge",
             price=CurrencyPerTime("0.2 usd/hour"),
@@ -32,9 +30,9 @@ def system_1ic_1cc_1app() -> System:
             mem=Storage("16 gibibytes"),
             limit=5,
         ),
-    ]
+    )
 
-    ccs = [
+    ccs = (
         ContainerClass(
             name="1c2g",
             cores=ComputationalUnits("1 core"),
@@ -42,7 +40,7 @@ def system_1ic_1cc_1app() -> System:
             app=apps[0],
             limit=10,
         ),
-    ]
+    )
 
     base_perf = RequestsPerTime("1 req/s")
     perfs = {
@@ -57,12 +55,9 @@ def system_1ic_1cc_1app() -> System:
 @pytest.fixture(scope="module")
 def system_2apps() -> System:
     """Sets up a system with 2 apps."""
-    apps = [
-        App(name="app0"),
-        App(name="app1"),
-    ]
+    apps = (App(name="app0"), App(name="app1"))
 
-    ics = [
+    ics = (
         InstanceClass(
             name="m5.large",
             price=CurrencyPerTime("0.2 usd/hour"),
@@ -91,9 +86,9 @@ def system_2apps() -> System:
             mem=Storage("64 gibibytes"),
             limit=5,
         ),
-    ]
+    )
 
-    ccs = [
+    ccs = (
         ContainerClass(
             name="1c2gApp0",
             cores=ComputationalUnits("1 cores"),
@@ -150,7 +145,7 @@ def system_2apps() -> System:
             app=apps[1],
             limit=10,
         ),
-    ]
+    )
 
     base_perf_app0 = RequestsPerTime("5 req/s")
     base_perf_app1 = RequestsPerTime("4 req/s")
@@ -195,11 +190,9 @@ def system_2apps() -> System:
 @pytest.fixture
 def system_2ic_2cc_1app() -> System:
     """System with 2 instance classes and 2 container classes, 1 app."""
-    apps = [
-        App(name="app0"),
-    ]
+    apps = (App(name="app0"),)
 
-    ics = [
+    ics = (
         InstanceClass(
             name="m5.large",
             price=CurrencyPerTime("0.2 usd/hour"),
@@ -214,9 +207,9 @@ def system_2ic_2cc_1app() -> System:
             mem=Storage("16 gibibytes"),
             limit=5,
         ),
-    ]
+    )
 
-    ccs = [
+    ccs = (
         ContainerClass(
             name="1c2g",
             cores=ComputationalUnits("1 cores"),
@@ -231,7 +224,7 @@ def system_2ic_2cc_1app() -> System:
             app=apps[0],
             limit=10,
         ),
-    ]
+    )
 
     base_perf = RequestsPerTime("1 req/s")
     perfs = {

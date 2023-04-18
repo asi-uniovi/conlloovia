@@ -60,3 +60,22 @@ class ProblemHelper:
                 ic.cores,
             ),
         )
+
+    def create_empty_vm_alloc(self, vms: dict[str, Vm]) -> Dict[Vm, bool]:
+        """Creates a VM allocation where no VM is allocated."""
+        vm_alloc: Dict[Vm, bool] = {}
+        for vm in vms.values():
+            vm_alloc[vm] = False
+
+        return vm_alloc
+
+    def create_empty_container_alloc(
+        self, containers: dict[str, Container]
+    ) -> Dict[Container, int]:
+        """Creates a container allocation where no container is
+        allocated."""
+        container_alloc: Dict[Container, int] = {}
+        for container in containers.values():
+            container_alloc[container] = 0
+
+        return container_alloc

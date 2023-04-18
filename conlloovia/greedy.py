@@ -60,15 +60,17 @@ class GreedyAllocator:
             problem: problem to solve"""
         self.problem = problem
 
-        helper = ProblemHelper(problem)
+        self.helper = ProblemHelper(problem)
 
         start_creation = time.perf_counter()
 
-        self.vms: dict[str, Vm] = helper.create_vms_dict()
-        self.containers: dict[str, Container] = helper.create_containers_dict(self.vms)
+        self.vms: dict[str, Vm] = self.helper.create_vms_dict()
+        self.containers: dict[str, Container] = self.helper.create_containers_dict(
+            self.vms
+        )
 
         # Precompute the cheapest instance class and the VMs of that IC
-        self.cheapest_ic = helper.compute_cheapest_ic()
+        self.cheapest_ic = self.helper.compute_cheapest_ic()
         self.cheapest_vms = [
             vm for vm in self.vms.values() if vm.ic == self.cheapest_ic
         ]
@@ -96,8 +98,8 @@ class GreedyAllocator:
             solution to the problem
         """
         state = GreedyAllocatorState(
-            vm_alloc=self._create_empty_vm_alloc(),
-            container_alloc=self._create_empty_container_alloc(),
+            vm_alloc=self.helper.create_empty_vm_alloc(self.vms),
+            container_alloc=self.helper.create_empty_container_alloc(self.containers),
         )
 
         for app in self.problem.system.apps:
@@ -201,8 +203,8 @@ class GreedyAllocator:
         if state.no_alloc_found:
             # Empty alloc
             alloc = Allocation(
-                vms=self._create_empty_vm_alloc(),
-                containers=self._create_empty_container_alloc(),
+                vms=self.helper.create_empty_vm_alloc(self.vms),
+                containers=self.helper.create_empty_container_alloc(self.containers),
             )
             status = Status.INFEASIBLE
             cost = Currency("0 usd")
@@ -241,23 +243,6 @@ class GreedyAllocator:
         cc_reqs_in_sched_ts = cc_perf * self.problem.sched_time_size
         wl_reqs = self.problem.workloads[app].num_reqs
         return math.ceil(wl_reqs / cc_reqs_in_sched_ts)
-
-    def _create_empty_vm_alloc(self) -> Dict[Vm, bool]:
-        """Creates a VM allocation where no VM is allocated."""
-        vm_alloc: Dict[Vm, bool] = {}
-        for vm in self.vms.values():
-            vm_alloc[vm] = False
-
-        return vm_alloc
-
-    def _create_empty_container_alloc(self) -> Dict[Container, int]:
-        """Creates a container allocation where no container is
-        allocated."""
-        container_alloc: Dict[Container, int] = {}
-        for container in self.containers.values():
-            container_alloc[container] = 0
-
-        return container_alloc
 
     def _is_new_vm_needed(
         self, current_vm: Optional[Vm], new_cores: ComputationalUnits, new_mem: Storage

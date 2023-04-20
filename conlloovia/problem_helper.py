@@ -25,9 +25,8 @@ class ProblemHelper:
         vms = {}
         for ic in self.problem.system.ics:
             for vm_num in range(ic.limit):
-                new_vm_name = f"{ic.name}-{vm_num}"
                 new_vm = Vm(ic=ic, num=vm_num)
-                vms[new_vm_name] = new_vm
+                vms[new_vm.name()] = new_vm
 
         return vms
 
@@ -36,8 +35,8 @@ class ProblemHelper:
         containers = {}
         for vm in vms.values():
             for cc in self.problem.system.ccs:
-                new_container_name = f"{vm.ic.name}-{vm.num}-{cc.name}"
-                containers[new_container_name] = Container(cc=cc, vm=vm)
+                new_container = Container(cc=cc, vm=vm)
+                containers[new_container.name()] = new_container
 
         return containers
 

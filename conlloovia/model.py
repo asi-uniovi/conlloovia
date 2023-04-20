@@ -136,6 +136,9 @@ class Vm:
     ic: InstanceClass
     num: int
 
+    def name(self) -> str:
+        return f"{self.ic.name}-{self.num}"
+
 
 @dataclass(frozen=True)
 class Container:
@@ -144,6 +147,9 @@ class Container:
 
     cc: ContainerClass
     vm: Vm
+
+    def name(self) -> str:
+        return f"{self.vm.name()}-{self.cc.name}"
 
 
 @dataclass(frozen=True)

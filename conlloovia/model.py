@@ -136,7 +136,7 @@ class Vm:
     ic: InstanceClass
     num: int
 
-    def name(self) -> str:
+    def name(self) -> str:  # pylint: disable=missing-function-docstring
         return f"{self.ic.name}-{self.num}"
 
 
@@ -148,7 +148,7 @@ class Container:
     cc: ContainerClass
     vm: Vm
 
-    def name(self) -> str:
+    def name(self) -> str:  # pylint: disable=missing-function-docstring
         return f"{self.vm.name()}-{self.cc.name}"
 
 

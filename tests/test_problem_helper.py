@@ -9,7 +9,7 @@ from conlloovia.model import (
     Workload,
     Problem,
 )
-from conlloovia.first_fit import ProblemHelper
+from conlloovia.problem_helper import ProblemHelper
 
 
 class TestSystem1ic1cc:
@@ -129,13 +129,13 @@ class TestSystem2ic2cc:
             "m5.xlarge-4-2c2g",
         ]
 
-    def test_get_vms_ordered_by_cores(self, system_1ic_1cc_1app) -> None:
+    def test_get_vms_ordered_by_cores_desc(self, system_1ic_1cc_1app) -> None:
         """Tests that the vms are ordered correctly."""
         problem = self.__set_up(system_1ic_1cc_1app)
 
         helper = ProblemHelper(problem)
         vms_dict = helper.create_vms_dict()
-        vms_ordered = helper.get_vms_ordered_by_cores(vms_dict)
+        vms_ordered = helper.get_vms_ordered_by_cores_desc(vms_dict)
 
         for vm_i in range(len(vms_ordered) - 1):
             assert vms_ordered[vm_i].ic.cores <= vms_ordered[vm_i + 1].ic.cores

@@ -3,8 +3,10 @@
 from typing import Dict
 
 from .model import (
+    App,
     Problem,
     Container,
+    ContainerClass,
     InstanceClass,
     Vm,
 )
@@ -40,12 +42,20 @@ class ProblemHelper:
 
         return containers
 
-    def get_vms_ordered_by_cores(self, vms: Dict[str, Vm]) -> list[Vm]:
+    def get_vms_ordered_by_cores_desc(self, vms: Dict[str, Vm]) -> list[Vm]:
         """Returns a list of VMs ordered by decreasing number of cores. If they
         have the same number of cores, it orders them by cost."""
         return sorted(
             vms.values(),
             key=lambda vm: (-vm.ic.cores, vm.ic.price),
+        )
+
+    def get_ccs_ordered_by_cores_asc(self) -> list[ContainerClass]:
+        """Returns a list of container classes ordered by increasing number of
+        cores and memory."""
+        return sorted(
+            self.problem.system.ccs,
+            key=lambda cc: (cc.cores, cc.mem),
         )
 
     def compute_cheapest_ic(self) -> InstanceClass:
@@ -78,3 +88,17 @@ class ProblemHelper:
             container_alloc[container] = 0
 
         return container_alloc
+
+    def get_ccs_for_app(self, app: App) -> tuple[ContainerClass]:
+        """Returns a tuple of container classes for this app."""
+        return tuple(cc for cc in self.problem.system.ccs if cc.app == app)
+
+    def get_ccs_ordered_by_cores_and_mem(self, app: App) -> tuple[Container]:
+        """Returns a tuple of container classes for this app ordered by increasing
+        number of cores and memory."""
+        return tuple(
+            sorted(
+                self.get_ccs_for_app(app),
+                key=lambda cc: (cc.cores, cc.mem),
+            )
+        )

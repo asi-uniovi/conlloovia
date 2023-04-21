@@ -103,8 +103,10 @@ class SolutionPrettyPrinter:
             ic = vm.ic
             app = cc.app
 
-            perf = self.sol.problem.system.perfs[ic, cc]
-            perf = (perf * self.sol.problem.sched_time_size).to_reduced_units()
+            perf_cc = self.sol.problem.system.perfs[ic, cc]
+            perf_cc = (perf_cc * self.sol.problem.sched_time_size).to_reduced_units()
+            perf_total = perf_cc * num_replicas
+            perf_str = f"{perf_cc.magnitude} x {num_replicas} = {perf_total}"
 
             if vm != prev_vm:
                 total_num_vms += 1
@@ -115,7 +117,7 @@ class SolutionPrettyPrinter:
                 ic_col = ""
 
             table.add_row(
-                ic_col, f"{cc.name} (x{int(num_replicas)})", app.name, str(perf)
+                ic_col, f"{cc.name} (x{int(num_replicas)})", app.name, perf_str
             )
 
         table.add_section()

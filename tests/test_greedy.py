@@ -161,15 +161,46 @@ class TestSystem2ic2cc:
             total_perf.to(RequestsPerTime("req/s")).magnitude,
         )
 
-    def test_perf6_greedy(self, system_2ic_2cc_1app) -> None:
-        """Test that the problem is infeasible."""
+    def test_perf6_greedy(self, system_2ic_2cc_1app):
+        """This problem requires two VM types, since only the cheapest one
+        would not be enough."""
         system = system_2ic_2cc_1app
-        _, sol = self.__solve_greedy(system, reqs=6)
+        workload, sol = self.__solve_greedy(system, reqs=6)
+
+        SolutionPrettyPrinter(sol).print()
+
+        assertions.assertEqual(sol.solving_stats.status, Status.INTEGER_FEASIBLE)
+        assertions.assertAlmostEqual(sol.cost, Currency("5*0.2/3600 usd + 0.4/3600 usd"))
+        assertions.assertEqual(sum(sol.alloc.vms.values()), 6)
+
+        vms_ics0 = [
+            vm for vm in sol.alloc.vms if (vm.ic == system.ics[0] and sol.alloc.vms[vm])
+        ]
+        assertions.assertEqual(len(vms_ics0), 5)
+
+        vms_ics1 = [
+            vm for vm in sol.alloc.vms if (vm.ic == system.ics[1] and sol.alloc.vms[vm])
+        ]
+        assertions.assertEqual(len(vms_ics1), 1)
+
+        total_perf = sum(
+            system.perfs[c.vm.ic, c.cc] * sol.alloc.containers[c]
+            for c in sol.alloc.containers
+            if sol.alloc.containers[c]
+        )
+        assertions.assertLessEqual(
+            workload.num_reqs.magnitude,
+            total_perf.to(RequestsPerTime("req/s")).magnitude,
+        )
+
+    def test_perf7_greedy(self, system_2ic_2cc_1app_small):
+        """This is not solvable, there are not enough resources."""
+        system = system_2ic_2cc_1app_small
+        workload, sol = self.__solve_greedy(system, reqs=8)
 
         SolutionPrettyPrinter(sol).print()
 
         assertions.assertEqual(sol.solving_stats.status, Status.INFEASIBLE)
-
 
 class Test2apps:
     """Tests for the greedy allocator with 2 apps."""

@@ -6,6 +6,7 @@ from rich.table import Table, Column
 from rich import print  # pylint: disable=redefined-builtin
 
 from .model import Solution, Status, Problem
+from cloudmodel.unified.units import Requests
 
 
 class SolutionPrettyPrinter:
@@ -92,6 +93,7 @@ class SolutionPrettyPrinter:
         total_num_containers = 0
         total_num_vms = 0
         prev_vm = None
+        total_perf = Requests("0 req")
         for container, num_replicas in alloc.containers.items():
             if num_replicas == 0:
                 continue
@@ -117,14 +119,19 @@ class SolutionPrettyPrinter:
                 ic_col = ""
 
             table.add_row(
-                ic_col, f"{cc.name} (x{int(num_replicas)})", app.name, perf_str
+                ic_col,
+                f"{cc.name} (x{int(num_replicas)})",
+                app.name,
+                f"{perf} (x{int(num_replicas)})",
             )
+            total_perf += perf * num_replicas
 
         table.add_section()
         table.add_row(
             f"total: {total_num_vms}",
             f"{int(total_num_containers)}",
             "",
+            f"{total_perf}",
         )
 
         return table

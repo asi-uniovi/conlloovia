@@ -107,8 +107,6 @@ class SolutionPrettyPrinter:
 
             perf_cc = self.sol.problem.system.perfs[ic, cc]
             perf_cc = (perf_cc * self.sol.problem.sched_time_size).to_reduced_units()
-            perf_total = perf_cc * num_replicas
-            perf_str = f"{perf_cc.magnitude} x {num_replicas} = {perf_total}"
 
             if vm != prev_vm:
                 total_num_vms += 1

@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Use linear programming to allocate containers to cloud infrastructure"
 authors = ["Joaquin Entrialgo Castaño <jentrialgo@uniovi.es>"]
 license = "MIT"
-readme = "README.rst"
+readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"

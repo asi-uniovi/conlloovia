@@ -72,7 +72,7 @@ class GreedyAllocator:
         )
 
         # Precompute the cheapest instance class and the VMs of that IC
-        self.ordered_ics: list = self._sort_ics()
+        self.ordered_ics: list = self.helper.get_ics_ordered()
         self.cheapest_ic = self._compute_cheapest_ic()
         self.cheapest_vms = self._regenerate_cheapest_vms()
 
@@ -268,44 +268,11 @@ class GreedyAllocator:
 
         return sol
 
-    def _create_vms_dict(self) -> Dict[str, Vm]:
-        """Creates a dictionary of VMs, indexed by their name."""
-        vms = {}
-        for ic in self.problem.system.ics:
-            for vm_num in range(ic.limit):
-                new_vm_name = f"{ic.name}-{vm_num}"
-                new_vm = Vm(ic=ic, num=vm_num)
-                vms[new_vm_name] = new_vm
-
-        return vms
-
-    def _create_containers_dict(self) -> Dict[str, Container]:
-        """Creates a dictionary of containers, indexed by their name. It assumes
-        that the VMs have already been created."""
-        containers = {}
-        for vm in self.vms.values():
-            for cc in self.problem.system.ccs:
-                new_container_name = f"{vm.ic.name}-{vm.num}-{cc.name}"
-                containers[new_container_name] = Container(cc=cc, vm=vm)
-
-        return containers
-
     def _compute_cheapest_ic(self):
         """Returns the cheapest instance class in terms of cores per dollar.
         If there are several, select the one with the smallest number of
         cores."""
         return self.ordered_ics[0]
-
-    def _sort_ics(self) -> list[InstanceClass]:
-        """Sorts the instance classes according to their price per core, and
-        in case of match, by the number of cores."""
-        return sorted(
-            self.problem.system.ics,
-            key=lambda ic: (
-                ic.price.to("usd/h") / ic.cores,
-                ic.cores,
-            ),
-        )
 
     def _compute_reqs_served_in_ts(self, ic, cc) -> int:
         """Computes the number of requests served in a scheduling time size
@@ -317,27 +284,8 @@ class GreedyAllocator:
         """Computes the number of CCs needed for the given app according to
         its workload."""
         cc = self.smallest_ccs_per_app[app]
-        # cc_perf = self.problem.system.perfs[self.cheapest_ic, cc]
         cc_reqs_in_sched_ts = self._compute_reqs_served_in_ts(self.cheapest_ic, cc)
-        # wl_reqs = self.problem.workloads[app].num_reqs
         return math.ceil(reqs_to_serve / cc_reqs_in_sched_ts)
-
-    def _create_empty_vm_alloc(self) -> Dict[Vm, bool]:
-        """Creates a VM allocation where no VM is allocated."""
-        vm_alloc: Dict[Vm, bool] = {}
-        for vm in self.vms.values():
-            vm_alloc[vm] = False
-
-        return vm_alloc
-
-    def _create_empty_container_alloc(self) -> Dict[Container, int]:
-        """Creates a container allocation where no container is
-        allocated."""
-        container_alloc: Dict[Container, int] = {}
-        for container in self.containers.values():
-            container_alloc[container] = 0
-
-        return container_alloc
 
     def _is_new_vm_needed(
         self, current_vm: Optional[Vm], new_cores: ComputationalUnits, new_mem: Storage

@@ -193,7 +193,7 @@ class TestSystem2ic2cc:
             total_perf.to(RequestsPerTime("req/s")).magnitude,
         )
 
-    def test_perf7_greedy(self, system_2ic_2cc_1app_small):
+    def test_perf8_greedy(self, system_2ic_2cc_1app_small):
         """This is not solvable, there are not enough resources."""
         system = system_2ic_2cc_1app_small
         workload, sol = self.__solve_greedy(system, reqs=8)

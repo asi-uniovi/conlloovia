@@ -102,3 +102,15 @@ class ProblemHelper:
                 key=lambda cc: (cc.cores, cc.mem),
             )
         )
+    
+    def get_ics_ordered(self) -> list[InstanceClass]:
+        """Sorts the instance classes according to their price per core, and
+        in case of match, by the number of cores."""
+        return sorted(
+            self.problem.system.ics,
+            key=lambda ic: (
+                ic.price.to("usd/h") / ic.cores,
+                ic.cores,
+            ),
+        )
+

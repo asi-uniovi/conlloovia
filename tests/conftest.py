@@ -240,11 +240,9 @@ def system_2ic_2cc_1app() -> System:
 @pytest.fixture
 def system_2ic_2cc_1app_small() -> System:
     """System with 2 instance classes and 2 container classes, 1 app."""
-    apps = [
-        App(name="app0"),
-    ]
+    apps = (App(name="app0"),)
 
-    ics = [
+    ics = (
         InstanceClass(
             name="m5.large",
             price=CurrencyPerTime("0.2 usd/hour"),
@@ -259,9 +257,9 @@ def system_2ic_2cc_1app_small() -> System:
             mem=Storage("16 gibibytes"),
             limit=2,
         ),
-    ]
+    )
 
-    ccs = [
+    ccs = (
         ContainerClass(
             name="1c2g",
             cores=ComputationalUnits("1 cores"),
@@ -276,7 +274,7 @@ def system_2ic_2cc_1app_small() -> System:
             app=apps[0],
             limit=10,
         ),
-    ]
+    )
 
     base_perf = RequestsPerTime("1 req/s")
     perfs = {

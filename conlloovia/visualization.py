@@ -4,9 +4,9 @@ conlloovia."""
 from rich.console import Console
 from rich.table import Table, Column
 from rich import print  # pylint: disable=redefined-builtin
+from cloudmodel.unified.units import Requests
 
 from .model import Solution, Status, Problem
-from cloudmodel.unified.units import Requests
 
 
 class SolutionPrettyPrinter:

@@ -170,7 +170,9 @@ class TestSystem2ic2cc:
         SolutionPrettyPrinter(sol).print()
 
         assertions.assertEqual(sol.solving_stats.status, Status.INTEGER_FEASIBLE)
-        assertions.assertAlmostEqual(sol.cost, Currency("5*0.2/3600 usd + 1*0.4/3600 usd"))
+        assertions.assertAlmostEqual(
+            sol.cost, Currency("5*0.2/3600 usd + 1*0.4/3600 usd")
+        )
         assertions.assertEqual(sum(sol.alloc.vms.values()), 6)
 
         vms_ics0 = [
@@ -196,11 +198,12 @@ class TestSystem2ic2cc:
     def test_perf8_greedy(self, system_2ic_2cc_1app_small):
         """This is not solvable, there are not enough resources."""
         system = system_2ic_2cc_1app_small
-        workload, sol = self.__solve_greedy(system, reqs=8)
+        _, sol = self.__solve_greedy(system, reqs=8)
 
         SolutionPrettyPrinter(sol).print()
 
         assertions.assertEqual(sol.solving_stats.status, Status.INFEASIBLE)
+
 
 class Test2apps:
     """Tests for the greedy allocator with 2 apps."""

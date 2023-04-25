@@ -17,7 +17,6 @@ from conlloovia import (
     System,
     Workload,
     Problem,
-    ConllooviaAllocator,
 )
 from conlloovia.visualization import SolutionPrettyPrinter
 from conlloovia.greedy import GreedyAllocator

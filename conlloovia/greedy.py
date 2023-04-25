@@ -11,7 +11,6 @@ from cloudmodel.unified.units import Currency, ComputationalUnits, Storage
 
 from .model import (
     Problem,
-    InstanceClass,
     ContainerClass,
     App,
     Allocation,

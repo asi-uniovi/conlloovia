@@ -122,9 +122,9 @@ class SolutionPrettyPrinter:
                 ic_col,
                 f"{cc.name} (x{int(num_replicas)})",
                 app.name,
-                f"{perf} (x{int(num_replicas)})",
+                f"{perf_cc} (x{int(num_replicas)})",
             )
-            total_perf += perf * num_replicas
+            total_perf += perf_cc * num_replicas
 
         table.add_section()
         table.add_row(

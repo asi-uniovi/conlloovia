@@ -170,7 +170,7 @@ class TestSystem2ic2cc:
         SolutionPrettyPrinter(sol).print()
 
         assertions.assertEqual(sol.solving_stats.status, Status.INTEGER_FEASIBLE)
-        assertions.assertAlmostEqual(sol.cost, Currency("5*0.2/3600 usd + 0.4/3600 usd"))
+        assertions.assertAlmostEqual(sol.cost, Currency("5*0.2/3600 usd + 1*0.4/3600 usd"))
         assertions.assertEqual(sum(sol.alloc.vms.values()), 6)
 
         vms_ics0 = [

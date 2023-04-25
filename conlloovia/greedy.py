@@ -317,10 +317,10 @@ class GreedyAllocator:
         """Computes the number of CCs needed for the given app according to
         its workload."""
         cc = self.smallest_ccs_per_app[app]
-        cc_perf = self.problem.system.perfs[self.cheapest_ic, cc]
-        cc_reqs_in_sched_ts = cc_perf * self.problem.sched_time_size
-        wl_reqs = self.problem.workloads[app].num_reqs
-        return math.ceil(wl_reqs / cc_reqs_in_sched_ts)
+        # cc_perf = self.problem.system.perfs[self.cheapest_ic, cc]
+        cc_reqs_in_sched_ts = self._compute_reqs_served_in_ts(self.cheapest_ic, cc)
+        # wl_reqs = self.problem.workloads[app].num_reqs
+        return math.ceil(reqs_to_serve / cc_reqs_in_sched_ts)
 
     def _create_empty_vm_alloc(self) -> Dict[Vm, bool]:
         """Creates a VM allocation where no VM is allocated."""

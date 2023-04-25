@@ -89,20 +89,20 @@ class ProblemHelper:
 
         return container_alloc
 
-    def get_ccs_for_app(self, app: App) -> tuple[ContainerClass]:
+    def get_ccs_for_app(self, app: App) -> tuple[ContainerClass, ...]:
         """Returns a tuple of container classes for this app."""
         return tuple(cc for cc in self.problem.system.ccs if cc.app == app)
 
-    def get_ccs_ordered_by_cores_and_mem(self, app: App) -> tuple[Container]:
-        """Returns a tuple of container classes for this app ordered by increasing
-        number of cores and memory."""
+    def get_ccs_ordered_by_cores_and_mem(self, app: App) -> tuple[ContainerClass, ...]:
+        """Returns a tuple of container classes for this app ordered by
+        increasing number of cores and memory."""
         return tuple(
             sorted(
                 self.get_ccs_for_app(app),
                 key=lambda cc: (cc.cores, cc.mem),
             )
         )
-    
+
     def get_ics_ordered(self) -> list[InstanceClass]:
         """Sorts the instance classes according to their price per core, and
         in case of match, by the number of cores."""
@@ -114,3 +114,19 @@ class ProblemHelper:
             ),
         )
 
+    def get_apps_ordered_by_container_size_asc(self) -> list[App]:
+        """Returns a list of apps ordered by increasing size of the smallest
+        container for each app."""
+
+        # Get all container classes ordered by ascending cores and memory
+        ccs_ordered = sorted(
+            self.problem.system.ccs,
+            key=lambda cc: (cc.cores, cc.mem),
+        )
+
+        ordered_apps = []
+        for cc in ccs_ordered:
+            if cc.app not in ordered_apps:
+                ordered_apps.append(cc.app)
+
+        return ordered_apps

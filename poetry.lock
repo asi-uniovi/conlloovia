@@ -57,8 +57,10 @@ develop = false
 pint = "0.20.1"
 
 [package.source]
-type = "directory"
-url = "../cloudmodel"
+type = "git"
+url = "https://jentrialgo@github.com/jldiaz-uniovi/cloudmodel.git"
+reference = "HEAD"
+resolved_reference = "d987309f2a8be2d8af028fe132a5b0ff65fa801b"
 
 [[package]]
 name = "colorama"
@@ -273,7 +275,7 @@ python-versions = ">=3.7"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "74bce09feac1a410d204b4392057ec455f0228a9ee64cfc68d16cb20a33c4202"
+content-hash = "8bc9e52cef253243afd2e2adb954bd1b7aa10ac6ea57e07dd20cb4f5259b66e6"
 
 [metadata.files]
 attrs = [

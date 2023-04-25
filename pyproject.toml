@@ -12,7 +12,8 @@ click = "^8.1.3"
 pulp = "^2.7.0"
 pint = "^0.20.1"
 rich = "^13.3.1"
-cloudmodel = {path = "../cloudmodel",  develop=true}
+cloudmodel = { git = "https://jentrialgo@github.com/jldiaz-uniovi/cloudmodel.git" }
+
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.2.0"

@@ -9,6 +9,7 @@ from typing import Dict, Optional
 
 from cloudmodel.unified.units import Currency, ComputationalUnits, Storage
 
+from conlloovia import problem_helper
 from .model import (
     Problem,
     InstanceClass,
@@ -21,7 +22,6 @@ from .model import (
     Status,
     SolvingStats,
 )
-from .problem_helper import ProblemHelper
 
 
 class GreedyAllocatorState:
@@ -64,13 +64,11 @@ class GreedyAllocator:
             problem: problem to solve"""
         self.problem = problem
 
-        self.helper = ProblemHelper(problem)
-
         start_creation = time.perf_counter()
 
-        self.vms: dict[str, Vm] = self.helper.create_vms_dict()
-        self.containers: dict[str, Container] = self.helper.create_containers_dict(
-            self.vms
+        self.vms: dict[str, Vm] = problem_helper.create_vms_dict(problem.system.ics)
+        self.containers: dict[str, Container] = problem_helper.create_containers_dict(
+            problem.system.ccs, self.vms
         )
 
         # Precompute the smallest container class for each app
@@ -81,7 +79,7 @@ class GreedyAllocator:
 
         # Precompute the cheapest instance class that can run the smallest container
         # classes and the VMs of that IC
-        self.ordered_ics = self.helper.get_ics_ordered()
+        self.ordered_ics = problem_helper.get_ics_ordered(problem.system.ics)
         self.cheapest_ic = self._compute_cheapest_ic()
         self.cheapest_vms = self._regenerate_cheapest_vms()
 
@@ -102,8 +100,10 @@ class GreedyAllocator:
             solution to the problem
         """
         state = GreedyAllocatorState(
-            vm_alloc=self.helper.create_empty_vm_alloc(self.vms),
-            container_alloc=self.helper.create_empty_container_alloc(self.containers),
+            vm_alloc=problem_helper.create_empty_vm_alloc(self.vms),
+            container_alloc=problem_helper.create_empty_container_alloc(
+                self.containers
+            ),
         )
 
         for app in self.problem.system.apps:
@@ -238,8 +238,8 @@ class GreedyAllocator:
         if state.no_alloc_found:
             # Empty alloc
             alloc = Allocation(
-                vms=self.helper.create_empty_vm_alloc(self.vms),
-                containers=self.helper.create_empty_container_alloc(self.containers),
+                vms=problem_helper.create_empty_vm_alloc(self.vms),
+                containers=problem_helper.create_empty_container_alloc(self.containers),
             )
             status = Status.INFEASIBLE
             cost = Currency("0 usd")

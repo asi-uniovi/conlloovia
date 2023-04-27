@@ -167,6 +167,9 @@ class ConllooviaAllocator:
                 self.container_names_per_vm[new_vm] = []
 
                 for cc in self.problem.system.ccs:
+                    if (ic, cc) not in self.problem.system.perfs:
+                        continue  # This CC cannot be executed in this IC
+
                     perf = self.problem.system.perfs[(ic, cc)]
                     new_container_name = f"{ic.name}-{vm_num}-{cc.name}"
                     self.container_names.append(new_container_name)

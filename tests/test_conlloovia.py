@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 """Tests for `ConllooviaAllocator`."""
 
+import pytest
 import unittest
 
 from click.testing import CliRunner
 from pulp import PULP_CBC_CMD  # type: ignore
 
 from cloudmodel.unified.units import (
+    ComputationalUnits,
     Currency,
     Time,
     Requests,
@@ -266,6 +268,72 @@ class TestInfeasible:
         problem = Problem(system=system, workloads=workloads, sched_time_size=Time("s"))
 
         alloc = ConllooviaAllocator(problem)
+        sol = alloc.solve()
+
+        assertions.assertEqual(sol.solving_stats.status, Status.INFEASIBLE)
+
+
+class TestConlloovia3apps:
+    """Tests for the conlloovia allocator with 3 apps."""
+
+    # 0.1 GB of memory for containers
+    @pytest.mark.parametrize("system_3apps", [0.1], indirect=True)
+    def test_conlloovia_3apps_01_gb(self, system_3apps):
+        """Tests that the first-fit allocator works with 3 apps. Memory for
+        containers is very small, so a feasible solution can be found."""
+        system = system_3apps
+
+        apps = system.apps
+        workloads = {
+            apps[0]: Workload(
+                num_reqs=Requests("22.5 req"), time_slot_size=Time("s"), app=apps[0]
+            ),
+            apps[1]: Workload(
+                num_reqs=Requests("15.3 req"), time_slot_size=Time("s"), app=apps[1]
+            ),
+            apps[2]: Workload(
+                num_reqs=Requests("8 req"), time_slot_size=Time("s"), app=apps[2]
+            ),
+        }
+        problem = Problem(system=system, workloads=workloads, sched_time_size=Time("s"))
+
+        ProblemPrettyPrinter(problem).print()
+
+        alloc = ConllooviaAllocator(problem)
+
+        sol = alloc.solve()
+
+        assertions.assertEqual(sol.solving_stats.status, Status.OPTIMAL)
+
+        # Check that no more than 8 replicas are used in all containers
+        for c in sol.alloc.containers:
+            assert sol.alloc.containers[c] <= 8
+
+    # 8 GB of memory for containers
+    @pytest.mark.parametrize("system_3apps", [8], indirect=True)
+    def test_conlloovia_3apps_8_gb(self, system_3apps):
+        """Tests that the first-fit allocator works with 3 apps. Memory for
+        containers is very big, so the system is infeasible."""
+        system = system_3apps
+
+        apps = system.apps
+        workloads = {
+            apps[0]: Workload(
+                num_reqs=Requests("22.5 req"), time_slot_size=Time("s"), app=apps[0]
+            ),
+            apps[1]: Workload(
+                num_reqs=Requests("15.3 req"), time_slot_size=Time("s"), app=apps[1]
+            ),
+            apps[2]: Workload(
+                num_reqs=Requests("8 req"), time_slot_size=Time("s"), app=apps[2]
+            ),
+        }
+        problem = Problem(system=system, workloads=workloads, sched_time_size=Time("s"))
+
+        ProblemPrettyPrinter(problem).print()
+
+        alloc = ConllooviaAllocator(problem)
+
         sol = alloc.solve()
 
         assertions.assertEqual(sol.solving_stats.status, Status.INFEASIBLE)

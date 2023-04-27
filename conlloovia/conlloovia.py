@@ -248,6 +248,13 @@ class ConllooviaAllocator:
                 f"Enough_mem_in_vm_{vm_name}",
             )
 
+            # Container limit restrictions
+            for container in containers_for_this_vm:
+                self.lp_problem += (
+                    self.z_vars[container] <= self.containers[container].cc.limit,
+                    f"Container_limit_for_{container}_in_vm_{vm_name}",
+                )
+
     def __create_solution(self, solving_stats: SolvingStats) -> Solution:
         self.__log_solution(solving_stats)
 

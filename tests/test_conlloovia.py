@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 """Tests for `ConllooviaAllocator`."""
 
-import pytest
 import unittest
 
+import pytest
 from click.testing import CliRunner
 from pulp import PULP_CBC_CMD  # type: ignore
 
 from cloudmodel.unified.units import (
-    ComputationalUnits,
     Currency,
     Time,
     Requests,

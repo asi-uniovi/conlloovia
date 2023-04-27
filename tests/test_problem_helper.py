@@ -9,7 +9,7 @@ from conlloovia.model import (
     Workload,
     Problem,
 )
-from conlloovia.problem_helper import ProblemHelper
+from conlloovia import problem_helper
 
 
 class TestSystem1ic1cc:
@@ -29,8 +29,7 @@ class TestSystem1ic1cc:
         system = system_1ic_1cc_1app
         problem = self.__set_up(system)
 
-        helper = ProblemHelper(problem)
-        vms_dict = helper.create_vms_dict()
+        vms_dict = problem_helper.create_vms_dict(problem.system.ics)
 
         assert list(vms_dict.keys()) == [
             "m5.xlarge-0",
@@ -47,9 +46,10 @@ class TestSystem1ic1cc:
         """Tests that the containers dictionary is created correctly."""
         problem = self.__set_up(system_1ic_1cc_1app)
 
-        helper = ProblemHelper(problem)
-        vms_dict = helper.create_vms_dict()
-        containers_dict = helper.create_containers_dict(vms_dict)
+        vms_dict = problem_helper.create_vms_dict(problem.system.ics)
+        containers_dict = problem_helper.create_containers_dict(
+            problem.system.ccs, vms_dict
+        )
 
         assert list(containers_dict.keys()) == [
             "m5.xlarge-0-1c2g",
@@ -79,8 +79,7 @@ class TestSystem2ic2cc:
         """Tests that the vms dictionary is created correctly."""
         problem = self.__set_up(system_2ic_2cc_1app)
 
-        helper = ProblemHelper(problem)
-        vms_dict = helper.create_vms_dict()
+        vms_dict = problem_helper.create_vms_dict(problem.system.ics)
 
         assert list(vms_dict.keys()) == [
             "m5.large-0",
@@ -102,9 +101,10 @@ class TestSystem2ic2cc:
         """Tests that the containers dictionary is created correctly."""
         problem = self.__set_up(system_2ic_2cc_1app)
 
-        helper = ProblemHelper(problem)
-        vms_dict = helper.create_vms_dict()
-        containers_dict = helper.create_containers_dict(vms_dict)
+        vms_dict = problem_helper.create_vms_dict(problem.system.ics)
+        containers_dict = problem_helper.create_containers_dict(
+            problem.system.ccs, vms_dict
+        )
 
         assert list(containers_dict.keys()) == [
             "m5.large-0-1c2g",
@@ -133,9 +133,8 @@ class TestSystem2ic2cc:
         """Tests that the vms are ordered correctly."""
         problem = self.__set_up(system_1ic_1cc_1app)
 
-        helper = ProblemHelper(problem)
-        vms_dict = helper.create_vms_dict()
-        vms_ordered = helper.get_vms_ordered_by_cores_desc(vms_dict)
+        vms_dict = problem_helper.create_vms_dict(problem.system.ics)
+        vms_ordered = problem_helper.get_vms_ordered_by_cores_desc(vms_dict)
 
         for vm_i in range(len(vms_ordered) - 1):
             assert vms_ordered[vm_i].ic.cores <= vms_ordered[vm_i + 1].ic.cores
@@ -144,7 +143,6 @@ class TestSystem2ic2cc:
         """Tests that the cheapest ic is computed correctly."""
         problem = self.__set_up(system_2ic_2cc_1app)
 
-        helper = ProblemHelper(problem)
-        cheapest_ic = helper.compute_cheapest_ic()
+        cheapest_ic = problem_helper.compute_cheapest_ic(problem.system.ics)
 
         assert cheapest_ic == problem.system.ics[0]

@@ -135,7 +135,7 @@ class GreedyAllocator:
         cc = self.smallest_ccs_per_app[app]
         state.requests_served = 0
         num_ccs = self._compute_num_ccs_for_app(
-            app, self.problem.workloads[app].num_reqs
+            app, self.problem.workloads[app].num_reqs.to("reqs").magnitude
         )
 
         logging.info("Allocating %i %s CCs for app %s", num_ccs, cc.name, app.name)
@@ -167,8 +167,11 @@ class GreedyAllocator:
             else:  # no break
                 continue_ = False
             if continue_:
+                reqs_to_serve = (
+                    self.problem.workloads[app].num_reqs.to("reqs").magnitude
+                )
                 num_ccs = self._compute_num_ccs_for_app(
-                    app, self.problem.workloads[app].num_reqs - state.requests_served
+                    app, reqs_to_serve - state.requests_served
                 )
 
     def _try_next_ic(self, state: GreedyAllocatorState) -> bool:
@@ -293,11 +296,16 @@ class GreedyAllocator:
         # No ic can allocate the smallest cc for all apps
         return None
 
-    def _compute_reqs_served_in_ts(self, ic: InstanceClass, cc: ContainerClass) -> int:
+    def _compute_reqs_served_in_ts(
+        self, ic: Optional[InstanceClass], cc: ContainerClass
+    ) -> int:
         """Computes the number of requests served in a scheduling time size
         by the given app, instance class and container class."""
+        if ic is None:
+            return 0
+
         cc_perf = self.problem.system.perfs[ic, cc]
-        return cc_perf * self.problem.sched_time_size
+        return (cc_perf * self.problem.sched_time_size).to("reqs").magnitude
 
     def _compute_num_ccs_for_app(self, app: App, reqs_to_serve: float) -> int:
         """Computes the number of CCs needed for the given app according to

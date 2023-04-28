@@ -1,8 +1,8 @@
 """Tests for `GreedyAllocator`."""
 
-import pytest
 import unittest
 
+import pytest
 from cloudmodel.unified.units import (
     ComputationalUnits,
     Currency,

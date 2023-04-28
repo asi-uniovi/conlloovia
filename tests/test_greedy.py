@@ -1,5 +1,6 @@
 """Tests for `GreedyAllocator`."""
 
+import pytest
 import unittest
 
 from cloudmodel.unified.units import (
@@ -297,3 +298,36 @@ class TestGreedyMem(unittest.TestCase):
         assertions.assertEqual(sum(sol.alloc.vms.values()), 2)
         assertions.assertEqual(sum(sol.alloc.containers.values()), 2)
         assertions.assertEqual(sol.cost, Currency("2*0.2/3600 usd"))
+
+
+class Test3AppsGreedy:
+    """Tests for the greedy allocator with 3 apps."""
+
+    # 8 GB of memory for containers
+    @pytest.mark.parametrize("system_3apps", [8], indirect=True)
+    def test_3apps_greedy_8gb(self, system_3apps) -> None:
+        """Test that the greedy allocator works with 3 apps."""
+        system = system_3apps
+
+        app0 = system.apps[0]
+        app1 = system.apps[1]
+        app2 = system.apps[2]
+        workloads = {
+            app0: Workload(
+                num_reqs=Requests("5 req"), time_slot_size=Time("s"), app=app0
+            ),
+            app1: Workload(
+                num_reqs=Requests("10 req"), time_slot_size=Time("s"), app=app1
+            ),
+            app2: Workload(
+                num_reqs=Requests("10 req"), time_slot_size=Time("s"), app=app2
+            ),
+        }
+        problem = Problem(system=system, workloads=workloads, sched_time_size=Time("s"))
+
+        ProblemPrettyPrinter(problem).print()
+
+        alloc = GreedyAllocator(problem)
+        sol = alloc.solve()
+
+        assert sol.solving_stats.status == Status.INFEASIBLE

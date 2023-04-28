@@ -11,6 +11,7 @@ from cloudmodel.unified.units import Currency, ComputationalUnits, Storage
 
 from .model import (
     Problem,
+    InstanceClass,
     ContainerClass,
     App,
     Allocation,
@@ -26,7 +27,9 @@ from .problem_helper import ProblemHelper
 class GreedyAllocatorState:
     """State of the GreedyAllocator while building a solution."""
 
-    def __init__(self, vm_alloc, container_alloc) -> None:
+    def __init__(
+        self, vm_alloc: dict[Vm, bool], container_alloc: dict[Container, int]
+    ) -> None:
         """Constructor. It assumes that the solving time starts when an object
         of this class is created. The vm_alloc and the container_alloc contain
         the allocation as it is being built. The current_vm is the VM that is
@@ -70,16 +73,17 @@ class GreedyAllocator:
             self.vms
         )
 
-        # Precompute the cheapest instance class and the VMs of that IC
-        self.ordered_ics: list = self.helper.get_ics_ordered()
-        self.cheapest_ic = self._compute_cheapest_ic()
-        self.cheapest_vms = self._regenerate_cheapest_vms()
-
         # Precompute the smallest container class for each app
         self.smallest_ccs_per_app: Dict[App, ContainerClass] = {}
         for app in problem.system.apps:
             ccs_for_app = [cc for cc in problem.system.ccs if cc.app == app]
             self.smallest_ccs_per_app[app] = min(ccs_for_app, key=lambda cc: cc.cores)
+
+        # Precompute the cheapest instance class that can run the smallest container
+        # classes and the VMs of that IC
+        self.ordered_ics = self.helper.get_ics_ordered()
+        self.cheapest_ic = self._compute_cheapest_ic()
+        self.cheapest_vms = self._regenerate_cheapest_vms()
 
         end_creation = time.perf_counter()
         self.creation_time = end_creation - start_creation
@@ -121,6 +125,13 @@ class GreedyAllocator:
     def _allocate_ccs_for_app(self, app: App, state: GreedyAllocatorState) -> None:
         """Allocates the container classes for the given app, updating the
         state."""
+        if self.cheapest_ic is None:
+            logging.info(
+                "No instance class that can allocate all container classes found"
+            )
+            state.no_alloc_found = True
+            return
+
         cc = self.smallest_ccs_per_app[app]
         state.requests_served = 0
         num_ccs = self._compute_num_ccs_for_app(
@@ -150,6 +161,7 @@ class GreedyAllocator:
             for _ in range(num_ccs):
                 self._allocate_cc(cc, state)
                 if state.no_alloc_found:
+                    logging.info("  Trying next Instance Class")
                     continue_ = self._try_next_ic(state)
                     break
             else:  # no break
@@ -170,12 +182,9 @@ class GreedyAllocator:
 
     def _allocate_cc(self, cc: ContainerClass, state: GreedyAllocatorState) -> None:
         """Allocates a container class replica, updating the state."""
-        new_cores = state.cores + cc.cores
-        new_mem = state.mem + cc.mem
-
-        if self._is_new_vm_needed(state.current_vm, new_cores, new_mem):
+        while self._is_new_vm_needed(cc, state):
             if state.num_vms == len(self.cheapest_vms):
-                logging.info("  Not enough VMs")
+                logging.info("  Not enough VMs of this Instance Class")
                 state.no_alloc_found = True
                 return
 
@@ -202,15 +211,6 @@ class GreedyAllocator:
             f"{state.current_vm.ic.name}-{state.current_vm.num}-{cc.name}"
         ]
         state.container_alloc[container] += 1
-        if state.container_alloc[container] > cc.limit:
-            logging.info(
-                "  Not enough containers of class %s in VM %s-%i",
-                cc.name,
-                state.current_vm.ic.name,
-                state.current_vm.num,
-            )
-            state.no_alloc_found = True
-            return
 
     def _create_new_vm(self, state: GreedyAllocatorState) -> None:
         """Creates a new VM, updating the state."""
@@ -267,19 +267,39 @@ class GreedyAllocator:
 
         return sol
 
-    def _compute_cheapest_ic(self):
-        """Returns the cheapest instance class in terms of cores per dollar.
-        If there are several, select the one with the smallest number of
-        cores."""
-        return self.ordered_ics[0]
+    def _compute_cheapest_ic(self) -> Optional[InstanceClass]:
+        """Returns the cheapest instance class, in terms of cores per dollar,
+        that can allocate the smallest container classes. If there are several,
+        select the one with the smallest number of cores. If none can allocate
+        the smallest container classes, return None."""
+        # Make a copy of ordered_ics because we will modify it while iterating
+        # over it
+        ordered_ics_copy = self.ordered_ics.copy()
 
-    def _compute_reqs_served_in_ts(self, ic, cc) -> int:
+        for ic in ordered_ics_copy:
+            can_allocate_all_smallest_ccs = all(
+                cc.cores <= ic.cores
+                and cc.mem <= ic.mem
+                and (ic, cc) in self.problem.system.perfs
+                for cc in self.smallest_ccs_per_app.values()
+            )
+            if can_allocate_all_smallest_ccs:
+                return ic
+
+            # This ic cannot allocate the smallest cc for some app, so we remove
+            # it from the list and try the next one
+            self.ordered_ics.remove(ic)
+
+        # No ic can allocate the smallest cc for all apps
+        return None
+
+    def _compute_reqs_served_in_ts(self, ic: InstanceClass, cc: ContainerClass) -> int:
         """Computes the number of requests served in a scheduling time size
         by the given app, instance class and container class."""
         cc_perf = self.problem.system.perfs[ic, cc]
         return cc_perf * self.problem.sched_time_size
 
-    def _compute_num_ccs_for_app(self, app, reqs_to_serve) -> int:
+    def _compute_num_ccs_for_app(self, app: App, reqs_to_serve: float) -> int:
         """Computes the number of CCs needed for the given app according to
         its workload."""
         cc = self.smallest_ccs_per_app[app]
@@ -287,14 +307,29 @@ class GreedyAllocator:
         return math.ceil(reqs_to_serve / cc_reqs_in_sched_ts)
 
     def _is_new_vm_needed(
-        self, current_vm: Optional[Vm], new_cores: ComputationalUnits, new_mem: Storage
+        self,
+        cc: ContainerClass,
+        state: GreedyAllocatorState,
     ) -> bool:
         """Checks if a new VM is needed. This will happen if the current VM is
-        None (i.e., we are allocating the first CC) or if the new number of
-        cores or memory exceeds the number of cores or memory of the current
-        VM."""
+        None (i.e., we are allocating the first CC), or the container class
+        cannot be allocated in the VM, which happens when there is no
+        performance information for the tuple (vm.ic, cc), or if the new number
+        of cores or memory exceeds the number of cores or memory of the current
+        VM, or the maximum number of containers for this container class has
+        been reached in this VM."""
+        if state.current_vm is None:
+            return True
+
+        if (state.current_vm.ic, cc) not in self.problem.system.perfs:
+            return True
+
+        new_cores = state.cores + cc.cores
+        new_mem = state.mem + cc.mem
+        container = Container(cc, state.current_vm)
+        n_replicas = state.container_alloc[container]
         return (
-            current_vm is None
-            or new_cores > current_vm.ic.cores
-            or new_mem > current_vm.ic.mem
+            new_cores > state.current_vm.ic.cores
+            or new_mem > state.current_vm.ic.mem
+            or n_replicas >= cc.limit
         )

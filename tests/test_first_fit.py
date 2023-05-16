@@ -13,7 +13,11 @@ from cloudmodel.unified.units import (
     Storage,
 )
 
-from conlloovia.first_fit import FirstFitAllocator, FirstFitAllocator2
+from conlloovia.first_fit import (
+    FirstFitAllocator,
+    FirstFitAllocator2,
+    FirstFitIcOrdering,
+)
 from conlloovia.visualization import SolutionPrettyPrinter, ProblemPrettyPrinter
 from conlloovia.model import (
     InstanceClass,
@@ -204,8 +208,9 @@ class Test2apps:
         assert sum(sol.alloc.vms.values()) == 1
         assert sum(sol.alloc.containers.values()) == 2
 
-    def test_2apps_first_fit2(self, system_2apps):
-        """Test that the first-fit allocator v2 works with 2 apps."""
+    def test_2apps_first_fit2_cores_descending(self, system_2apps):
+        """Test that the first-fit allocator v2 works with 2 apps using core
+        descending ordering."""
         system = system_2apps
 
         app0 = system.apps[0]
@@ -222,7 +227,7 @@ class Test2apps:
 
         ProblemPrettyPrinter(problem).print()
 
-        alloc = FirstFitAllocator2(problem)
+        alloc = FirstFitAllocator2(problem, ordering=FirstFitIcOrdering.CORE_DESCENDING)
         sol = alloc.solve()
 
         SolutionPrettyPrinter(sol).print()
@@ -230,6 +235,36 @@ class Test2apps:
         assert sol.cost == Currency("1.6/3600 usd")
         assert sum(sol.alloc.vms.values()) == 1
         assert sum(sol.alloc.containers.values()) == 2
+
+    def test_2apps_first_fit2_price_ascending(self, system_2apps):
+        """Test that the first-fit allocator v2 works with 2 apps using price
+        ascending ordering."""
+        system = system_2apps
+
+        app0 = system.apps[0]
+        app1 = system.apps[1]
+        workloads = {
+            app0: Workload(
+                num_reqs=Requests("5 req"), time_slot_size=Time("s"), app=app0
+            ),
+            app1: Workload(
+                num_reqs=Requests("10 req"), time_slot_size=Time("s"), app=app1
+            ),
+        }
+        problem = Problem(system=system, workloads=workloads, sched_time_size=Time("s"))
+
+        ProblemPrettyPrinter(problem).print()
+
+        alloc = FirstFitAllocator2(
+            problem, ordering=FirstFitIcOrdering.PRICE_ASCENDING
+        )
+        sol = alloc.solve()
+
+        SolutionPrettyPrinter(sol).print()
+
+        assert sol.cost == Currency("0.8/3600 usd")
+        assert sum(sol.alloc.vms.values()) == 4
+        assert sum(sol.alloc.containers.values()) == 4
 
 
 class TestFirstFitMem(unittest.TestCase):
@@ -325,7 +360,7 @@ class TestFirstFit3apps:
 
         ProblemPrettyPrinter(problem).print()
 
-        alloc = FirstFitAllocator2(problem)
+        alloc = FirstFitAllocator2(problem, ordering=FirstFitIcOrdering.CORE_DESCENDING)
 
         sol = alloc.solve()
 
@@ -364,7 +399,7 @@ class TestFirstFit3apps:
 
         ProblemPrettyPrinter(problem).print()
 
-        alloc = FirstFitAllocator2(problem)
+        alloc = FirstFitAllocator2(problem, ordering=FirstFitIcOrdering.CORE_DESCENDING)
 
         sol = alloc.solve()
 

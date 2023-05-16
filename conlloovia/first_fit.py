@@ -17,7 +17,7 @@ There's also a second implementation of this allocator called
 FirstFitAllocator2. While the first version creates and empty allocation and
 then fills it, the second version creates the allocation while it's filling it.
 """
-
+from enum import Enum
 from dataclasses import dataclass
 import logging
 import time
@@ -426,24 +426,43 @@ class FirstFitAllocator:
         return cores + cc.cores <= vm.ic.cores and mem + cc.mem <= vm.ic.mem
 
 
+class FirstFitIcOrdering(Enum):
+    """Ordering of the Instance Classes in FirstFitAllocator2."""
+
+    CORE_DESCENDING = 1
+    PRICE_ASCENDING = 2
+
+
 class FirstFitAllocator2:
     """First fit allocator."""
 
-    def __init__(self, problem: Problem) -> None:
+    def __init__(self, problem: Problem, ordering: FirstFitIcOrdering) -> None:
         """Constructor.
 
         Args:
             problem: problem to solve"""
         self.problem = problem
+        self.ordering = ordering
 
         start_creation = time.perf_counter()
 
-        # Create list of ICs ordered by decreasing number of cores and memory
-        self.sorted_ics = sorted(
-            problem.system.ics,
-            key=lambda ic: (ic.cores, ic.mem),
-            reverse=True,
-        )
+        # Create list of ICs ordered according to the ordering
+        if ordering == FirstFitIcOrdering.CORE_DESCENDING:
+            self.sorted_ics = sorted(
+                problem.system.ics,
+                key=lambda ic: (ic.cores, ic.mem),
+                reverse=True,
+            )
+        elif ordering == FirstFitIcOrdering.PRICE_ASCENDING:
+            self.sorted_ics = sorted(
+                problem.system.ics,
+                key=lambda ic: (
+                    ic.price.to("usd/h") / ic.cores,
+                    ic.cores,
+                ),
+            )
+        else:
+            raise ValueError(f"Unknown ordering {ordering}")
 
         sorted_apps_ccs = {}
         for app in self.problem.system.apps:

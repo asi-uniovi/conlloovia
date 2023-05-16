@@ -211,7 +211,7 @@ class GreedyAllocator:
         )
 
         container = self.containers[
-            f"{state.current_vm.ic.name}-{state.current_vm.num}-{cc.name}"
+            f"{state.current_vm.ic.name}-{state.current_vm.id_}-{cc.name}"
         ]
         state.container_alloc[container] += 1
 

@@ -161,7 +161,7 @@ class ConllooviaAllocator:
         for ic in self.problem.system.ics:
             for vm_num in range(ic.limit):
                 new_vm_name = f"{ic.name}-{vm_num}"
-                new_vm = Vm(ic=ic, num=vm_num)
+                new_vm = Vm(ic=ic, id_=vm_num)
                 self.vm_names.append(new_vm_name)
                 self.vms[new_vm_name] = new_vm
                 self.container_names_per_vm[new_vm] = []

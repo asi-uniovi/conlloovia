@@ -134,10 +134,10 @@ class Vm:
     VM in the list of instance classes."""
 
     ic: InstanceClass
-    num: int
+    id_: int
 
     def name(self) -> str:  # pylint: disable=missing-function-docstring
-        return f"{self.ic.name}-{self.num}"
+        return f"{self.ic.name}-{self.id_}"
 
 
 @dataclass(frozen=True)

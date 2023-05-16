@@ -17,7 +17,7 @@ def create_vms_dict(ics: tuple[InstanceClass, ...]) -> Dict[str, Vm]:
     vms = {}
     for ic in ics:
         for vm_num in range(ic.limit):
-            new_vm = Vm(ic=ic, num=vm_num)
+            new_vm = Vm(ic=ic, id_=vm_num)
             vms[new_vm.name()] = new_vm
 
     return vms

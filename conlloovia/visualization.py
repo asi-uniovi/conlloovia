@@ -62,7 +62,7 @@ class SolutionPrettyPrinter:
             cost = (ic.price * self.sol.problem.sched_time_size).to_reduced_units()
             total_cost += cost
 
-            table.add_row(f"{ic.name}[{vm.num}]", str(cost))
+            table.add_row(f"{ic.name}[{vm.id_}]", str(cost))
 
         table.add_section()
 
@@ -112,7 +112,7 @@ class SolutionPrettyPrinter:
                 total_num_vms += 1
                 table.add_section()
                 prev_vm = vm
-                ic_col = f"{ic.name}[{vm.num}]"
+                ic_col = f"{ic.name}[{vm.id_}]"
             else:
                 ic_col = ""
 

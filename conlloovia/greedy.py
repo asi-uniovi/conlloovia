@@ -324,8 +324,7 @@ class GreedyAllocator:
         cannot be allocated in the VM, which happens when there is no
         performance information for the tuple (vm.ic, cc), or if the new number
         of cores or memory exceeds the number of cores or memory of the current
-        VM, or the maximum number of containers for this container class has
-        been reached in this VM."""
+        VM."""
         if state.current_vm is None:
             return True
 
@@ -334,10 +333,6 @@ class GreedyAllocator:
 
         new_cores = state.cores + cc.cores
         new_mem = state.mem + cc.mem
-        container = Container(cc, state.current_vm)
-        n_replicas = state.container_alloc[container]
         return (
-            new_cores > state.current_vm.ic.cores
-            or new_mem > state.current_vm.ic.mem
-            or n_replicas >= cc.limit
+            new_cores > state.current_vm.ic.cores or new_mem > state.current_vm.ic.mem
         )

@@ -304,10 +304,6 @@ class TestConlloovia3apps:
 
         assertions.assertEqual(sol.solving_stats.status, Status.OPTIMAL)
 
-        # Check that no more than 8 replicas are used in all containers
-        for c in sol.alloc.containers:
-            assert sol.alloc.containers[c] <= 8
-
     # 8 GB of memory for containers
     @pytest.mark.parametrize("system_3apps", [8], indirect=True)
     def test_conlloovia_3apps_8_gb(self, system_3apps):

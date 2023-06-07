@@ -63,7 +63,6 @@ class ContainerClass:
     cores: ComputationalUnits
     mem: Storage
     app: App
-    limit: int  # Max. number of containers of this container class
 
     def __post_init__(self):
         """Checks dimensions are valid and store them in the standard units."""

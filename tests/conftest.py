@@ -38,7 +38,6 @@ def system_1ic_1cc_1app() -> System:
             cores=ComputationalUnits("1 core"),
             mem=Storage("2 gibibytes"),
             app=apps[0],
-            limit=10,
         ),
     )
 
@@ -94,56 +93,48 @@ def system_2apps() -> System:
             cores=ComputationalUnits("1 cores"),
             mem=Storage("2 gibibytes"),
             app=apps[0],
-            limit=10,
         ),
         ContainerClass(
             name="2c2gApp0",
             cores=ComputationalUnits("2 cores"),
             mem=Storage("2 gibibytes"),
             app=apps[0],
-            limit=10,
         ),
         ContainerClass(
             name="4c2gApp0",
             cores=ComputationalUnits("4 cores"),
             mem=Storage("2 gibibytes"),
             app=apps[0],
-            limit=10,
         ),
         ContainerClass(
             name="1c2gApp1",
             cores=ComputationalUnits("1 cores"),
             mem=Storage("2 gibibytes"),
             app=apps[1],
-            limit=10,
         ),
         ContainerClass(
             name="2c2gApp1",
             cores=ComputationalUnits("2 cores"),
             mem=Storage("2 gibibytes"),
             app=apps[1],
-            limit=10,
         ),
         ContainerClass(
             name="1c4gApp1",
             cores=ComputationalUnits("1 cores"),
             mem=Storage("4 gibibytes"),
             app=apps[1],
-            limit=10,
         ),
         ContainerClass(
             name="2c4gApp1",
             cores=ComputationalUnits("2 cores"),
             mem=Storage("4 gibibytes"),
             app=apps[1],
-            limit=10,
         ),
         ContainerClass(
             name="1c8gApp1",
             cores=ComputationalUnits("1 cores"),
             mem=Storage("8 gibibytes"),
             app=apps[1],
-            limit=10,
         ),
     )
 
@@ -215,14 +206,12 @@ def system_2ic_2cc_1app() -> System:
             cores=ComputationalUnits("1 cores"),
             mem=Storage("2 gibibytes"),
             app=apps[0],
-            limit=10,
         ),
         ContainerClass(
             name="2c2g",
             cores=ComputationalUnits("2 cores"),
             mem=Storage("2 gibibytes"),
             app=apps[0],
-            limit=10,
         ),
     )
 
@@ -265,14 +254,12 @@ def system_2ic_2cc_1app_small() -> System:
             cores=ComputationalUnits("1 cores"),
             mem=Storage("2 gibibytes"),
             app=apps[0],
-            limit=10,
         ),
         ContainerClass(
             name="2c2g",
             cores=ComputationalUnits("2 cores"),
             mem=Storage("2 gibibytes"),
             app=apps[0],
-            limit=10,
         ),
     )
 
@@ -332,21 +319,18 @@ def system_3apps(request):
             cores=ComputationalUnits("0.150 cores"),
             mem=Storage(f"{mem_gb} gibibytes"),
             app=apps[0],
-            limit=8,
         ),
         ContainerClass(
             name="450a0",
             cores=ComputationalUnits("0.450 cores"),
             mem=Storage(f"{mem_gb} gibibytes"),
             app=apps[0],
-            limit=8,
         ),
         ContainerClass(
             name="300a0",
             cores=ComputationalUnits("0.300 cores"),
             mem=Storage(f"{mem_gb} gibibytes"),
             app=apps[0],
-            limit=8,
         ),
         # a1
         ContainerClass(
@@ -354,21 +338,18 @@ def system_3apps(request):
             cores=ComputationalUnits("0.650 cores"),
             mem=Storage(f"{mem_gb} gibibytes"),
             app=apps[1],
-            limit=8,
         ),
         ContainerClass(
             name="130a1",
             cores=ComputationalUnits("0.130 cores"),
             mem=Storage(f"{mem_gb} gibibytes"),
             app=apps[1],
-            limit=8,
         ),
         ContainerClass(
             name="260a1",
             cores=ComputationalUnits("0.260 cores"),
             mem=Storage(f"{mem_gb} gibibytes"),
             app=apps[1],
-            limit=8,
         ),
         # a2
         ContainerClass(
@@ -376,14 +357,12 @@ def system_3apps(request):
             cores=ComputationalUnits("1.400 cores"),
             mem=Storage(f"{mem_gb} gibibytes"),
             app=apps[2],
-            limit=8,
         ),
         ContainerClass(
             name="2800a2",
             cores=ComputationalUnits("2.800 cores"),
             mem=Storage(f"{mem_gb} gibibytes"),
             app=apps[2],
-            limit=8,
         ),
     )
 

@@ -265,7 +265,6 @@ class TestGreedyMem(unittest.TestCase):
                 cores=ComputationalUnits("1 cores"),
                 mem=Storage("8 gibibytes"),
                 app=apps[0],
-                limit=10,
             ),
         )
 

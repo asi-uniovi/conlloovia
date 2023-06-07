@@ -255,9 +255,7 @@ class Test2apps:
 
         ProblemPrettyPrinter(problem).print()
 
-        alloc = FirstFitAllocator2(
-            problem, ordering=FirstFitIcOrdering.PRICE_ASCENDING
-        )
+        alloc = FirstFitAllocator2(problem, ordering=FirstFitIcOrdering.PRICE_ASCENDING)
         sol = alloc.solve()
 
         SolutionPrettyPrinter(sol).print()
@@ -299,7 +297,6 @@ class TestFirstFitMem(unittest.TestCase):
                 cores=ComputationalUnits("1 cores"),
                 mem=Storage("8 gibibytes"),
                 app=apps[0],
-                limit=10,
             ),
         ]
 

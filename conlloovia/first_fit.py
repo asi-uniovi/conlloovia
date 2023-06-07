@@ -391,7 +391,7 @@ class FirstFitAllocator:
             if state.reqs_allocated >= state.reqs_to_allocate:
                 break
 
-            while replica_info.num_replicas < replica_info.cc.limit:
+            while True:
                 cc = replica_info.cc
                 if self.cc_fits_in_vm(cc, vm):
                     replica_info.num_replicas += 1

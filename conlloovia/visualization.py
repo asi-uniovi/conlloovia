@@ -181,10 +181,9 @@ class ProblemPrettyPrinter:
         table.add_column("Container class")
         table.add_column("Cores", justify="right")
         table.add_column("Mem", justify="right")
-        table.add_column("Limit", justify="right")
 
         for cc in self.problem.system.ccs:
-            table.add_row(cc.name, str(cc.cores), str(cc.mem), str(cc.limit))
+            table.add_row(cc.name, str(cc.cores), str(cc.mem))
 
         return table
 

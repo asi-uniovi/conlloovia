@@ -668,6 +668,9 @@ class FirstFitAllocator2:
 
     def __compute_cost(self) -> Currency:
         """Compute the cost of the current state."""
+        if not self.used_vms:
+            return Currency("0 usd")
+
         return sum(
             vm_info.vm.ic.price * self.problem.sched_time_size
             for vm_info in self.used_vms

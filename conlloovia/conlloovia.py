@@ -141,7 +141,7 @@ class ConllooviaAllocator:
                 self.lp_problem.status, self.lp_problem.sol_status
             )
 
-        if status == Status.INTEGER_FEASIBLE:
+        if status in [Status.INTEGER_FEASIBLE, status == Status.ABORTED]:
             lower_bound = self.lp_problem.bestBound
 
         solving_stats = SolvingStats(

@@ -126,6 +126,24 @@ class Problem:
                     f"All workloads should have the time slot unit {self.sched_time_size}"
                 )
 
+    def num_vars_x(self) -> int:
+        """Returns the number of x variables in the problem."""
+        num = 0
+        for ic in self.system.ics:
+            num += ic.limit
+
+        return num
+
+    def num_vars_z(self) -> int:
+        """Returns the number of z variables in the problem."""
+        num = 0
+        for ic in self.system.ics:
+            for cc in self.system.ccs:
+                if (ic, cc) in self.system.perfs:
+                    num += ic.limit
+
+        return num
+
 
 @dataclass(frozen=True)
 class Vm:
@@ -188,3 +206,11 @@ class Solution:
     def __post_init__(self):
         """Checks dimensions are valid and store them in the standard units."""
         object.__setattr__(self, "cost", self.cost.to("usd"))
+
+    def num_vars_x(self) -> int:
+        """Returns the number of x variables in the problem."""
+        return self.problem.num_vars_x()
+
+    def num_vars_z(self) -> int:
+        """Returns the number of z variables in the problem."""
+        return self.problem.num_vars_z()

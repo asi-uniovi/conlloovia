@@ -3,6 +3,7 @@ ConllooviaAllocator, which receives a conlloovia problem and constructs and
 solves the corresponding linear programming problem using pulp."""
 
 import logging
+import math
 import os
 import time
 from typing import Any
@@ -30,11 +31,13 @@ from cloudmodel.unified.units import Currency
 
 from .model import (
     Problem,
+    System,
     InstanceClass,
     App,
     Allocation,
     Vm,
     Container,
+    ContainerClass,
     Solution,
     RequestsPerTime,
     Status,
@@ -297,6 +300,146 @@ class ConllooviaAllocator:
 
         logging.info("Total cost: %f", pulp.value(self.lp_problem.objective))
         logging.info("Solving stats: %s", solving_stats)
+
+
+class LimitsAdapter:
+    """Class that adapts the limits of a problem to a new set of limits following this
+    algorithm:
+
+    1) For each container class, compute the maximum number of containers that can be
+       allocated in each IC where it can run. The valid combinations of CCs and ICs can be
+       obtained from the perfs dictionary.
+    2) Compute the performance of each IC with that maximum number of containers for each
+       container class.
+    3) Obtain the performance of each IC for each app with the container class that
+       maximizes the performance.
+    4) Compute the number of VMs required to satisfy the workload with that performance
+       for each app and each instance class.
+    5) Compute the limits for each IC as the sum of the minimum number of VMs required for
+       all the apps that use that IC.
+
+    The new problem will have the same apps and container classes, but the instance
+    classes will be the same as the original ones, but with the new limits.
+
+    Usage: create an instance of this class with the problem to adapt and call
+    compute_adapted_problem() to obtain the new problem.
+    """
+
+    def __init__(self, problem: Problem) -> None:
+        self.problem = problem
+
+    def compute_adapted_problem(self) -> Problem:
+        """Computes the adapted problem."""
+        new_system = LimitsAdapter.create_system_with_new_limits(
+            self.problem.system, self.compute_num_vms_per_ic_to_serve_all_wl()
+        )
+        new_problem = Problem(
+            system=new_system,
+            workloads=self.problem.workloads,
+            sched_time_size=self.problem.sched_time_size,
+        )
+        return new_problem
+
+    def compute_num_vms_per_ic_to_serve_all_wl(self) -> dict[InstanceClass, int]:
+        """Computes the required VM to handle all the workload using only one instance
+        class."""
+        # 1) Compute the performance of each IC with the maximum number of containers
+        perf_per_cc_maximized = {}
+        for ic, cc in self.problem.system.perfs:
+            max_containers = LimitsAdapter.compute_max_containers(ic, cc)
+            perf_per_cc_maximized[ic, cc] = (
+                max_containers * self.problem.system.perfs[ic, cc]
+            )
+
+        # 2) and 3) Take for each app and instance class the container class with the
+        # highest performance when maximized
+        perf_per_app_ic_maximized = {}
+        for ic, cc in perf_per_cc_maximized:
+            if (ic, cc.app) not in perf_per_app_ic_maximized:
+                perf_per_app_ic_maximized[ic, cc.app] = perf_per_cc_maximized[ic, cc]
+            else:
+                if (
+                    perf_per_cc_maximized[ic, cc]
+                    > perf_per_app_ic_maximized[ic, cc.app]
+                ):
+                    perf_per_app_ic_maximized[ic, cc.app] = perf_per_cc_maximized[
+                        ic, cc
+                    ]
+
+        # 4) Compute the number of VMs required for each app for each IC
+        num_vms_per_app_per_ic = {}
+        for (ic, app), perf in perf_per_app_ic_maximized.items():
+            workload = (
+                self.problem.workloads[app].num_reqs
+                / self.problem.workloads[app].time_slot_size
+            )
+            if perf.to("rps").magnitude == 0:
+                num_vms_per_app_per_ic[ic, app] = 0
+            else:
+                num_vms_per_app_per_ic[ic, app] = math.ceil(
+                    workload.to("rps").magnitude / perf.to("rps").magnitude
+                )
+
+        # 5) Compute the required number of VMs for each IC as the sum of the number of
+        # VMs required for each app that uses that IC
+        num_vms_per_ic: dict[InstanceClass, int] = {}
+        for ic in self.problem.system.ics:
+            num_vms_per_ic[ic] = 0
+            for app in self.problem.system.apps:
+                num_vms_per_ic[ic] += num_vms_per_app_per_ic[ic, app]
+
+        return num_vms_per_ic
+
+    @staticmethod
+    def compute_max_containers(ic: InstanceClass, cc: ContainerClass):
+        """Returns the maximum number of containers that can be allocated in the given IC
+        for the given CC taking into account the cores and the memory."""
+        max_containers_cc = int(ic.cores / cc.cores)
+
+        # Some times, the memory is not considered and the container class has 0 memory
+        if cc.mem.to("bytes").magnitude == 0:
+            return max_containers_cc
+
+        max_containers_mem = int(ic.mem / cc.mem)
+        return min(max_containers_cc, max_containers_mem)
+
+    @staticmethod
+    def create_system_with_new_limits(
+        system: System, new_limits: dict[InstanceClass, int]
+    ):
+        """Returns a new system with the limits replaced as specified in new_limits."""
+
+        if not set(new_limits.keys()) == set(system.ics):
+            raise ValueError(
+                "The keys of new_limits must be all the instance classes in the original "
+                "system"
+            )
+
+        # Create the new instance classes from the old ones, but with the new limits
+        new_ic_tuple = tuple(
+            InstanceClass(
+                name=ic.name,
+                price=ic.price,
+                cores=ic.cores,
+                mem=ic.mem,
+                limit=new_limits[ic],
+            )
+            for ic in system.ics
+            if new_limits[ic] > 0
+        )
+
+        # Create the new perfs using the new instance classes
+        new_perfs = {}
+        for ic, cc in system.perfs:
+            for new_ic in new_ic_tuple:
+                if new_ic.name == ic.name:
+                    new_perfs[new_ic, cc] = system.perfs[ic, cc]
+                    break
+
+        new_system = System(
+            apps=system.apps, ics=new_ic_tuple, ccs=system.ccs, perfs=new_perfs
+        )
+        return new_system
 
 
 # pylint: disable = E, W, R, C

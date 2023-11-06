@@ -269,7 +269,10 @@ class ConllooviaAllocator:
             containers=container_alloc,
         )
 
-        if solving_stats.status in [Status.OPTIMAL, Status.INTEGER_FEASIBLE]:
+        # The objective could be None if there is no workload
+        if solving_stats.status in [Status.OPTIMAL, Status.INTEGER_FEASIBLE] and (
+            pulp.value(self.lp_problem.objective) is not None
+        ):
             cost = pulp.value(self.lp_problem.objective) * Currency("1 usd")
         else:
             cost = Currency("0 usd")
@@ -347,6 +350,11 @@ class LimitsAdapter:
         perf_per_cc_maximized = {}
         for ic, cc in self.problem.system.perfs:
             max_containers = LimitsAdapter.compute_max_containers(ic, cc)
+
+            # If the IC cannot run the CC, do not consider it
+            if max_containers == 0:
+                continue
+
             perf_per_cc_maximized[ic, cc] = (
                 max_containers * self.problem.system.perfs[ic, cc]
             )
@@ -386,7 +394,8 @@ class LimitsAdapter:
         for ic in self.problem.system.ics:
             num_vms_per_ic[ic] = 0
             for app in self.problem.system.apps:
-                num_vms_per_ic[ic] += num_vms_per_app_per_ic[ic, app]
+                if (ic, app) in num_vms_per_app_per_ic:
+                    num_vms_per_ic[ic] += num_vms_per_app_per_ic[ic, app]
 
         return num_vms_per_ic
 

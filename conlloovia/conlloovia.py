@@ -364,12 +364,14 @@ class LimitsAdapter:
         perf_per_app_ic_maximized = {}
         for ic, cc in perf_per_cc_maximized:
             if (ic, cc.app) not in perf_per_app_ic_maximized:
+                # First time we see this IC for this app
                 perf_per_app_ic_maximized[ic, cc.app] = perf_per_cc_maximized[ic, cc]
             else:
                 if (
                     perf_per_cc_maximized[ic, cc]
                     > perf_per_app_ic_maximized[ic, cc.app]
                 ):
+                    # This CC has a higher performance than the previous maximum
                     perf_per_app_ic_maximized[ic, cc.app] = perf_per_cc_maximized[
                         ic, cc
                     ]
@@ -403,14 +405,14 @@ class LimitsAdapter:
     def compute_max_containers(ic: InstanceClass, cc: ContainerClass):
         """Returns the maximum number of containers that can be allocated in the given IC
         for the given CC taking into account the cores and the memory."""
-        max_containers_cc = int(ic.cores / cc.cores)
+        max_containers_cores = int(ic.cores / cc.cores)
 
         # Some times, the memory is not considered and the container class has 0 memory
         if cc.mem.to("bytes").magnitude == 0:
-            return max_containers_cc
+            return max_containers_cores
 
         max_containers_mem = int(ic.mem / cc.mem)
-        return min(max_containers_cc, max_containers_mem)
+        return min(max_containers_cores, max_containers_mem)
 
     @staticmethod
     def create_system_with_new_limits(

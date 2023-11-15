@@ -127,7 +127,7 @@ class TestFirstFit3apps:
 
     # 2 GB of memory for containers
     @pytest.mark.parametrize("system_3apps", [2], indirect=True)
-    def test_first_fit_3apps_infeasible(self, system_3apps) -> None:
+    def test_first_fit_3apps_aborted(self, system_3apps) -> None:
         """Tests that the first-fit allocator works with 3 apps. Memory for
         containers is very big, so the first-fit allocator does not find a
         solution."""
@@ -153,4 +153,4 @@ class TestFirstFit3apps:
 
         sol = alloc.solve()
 
-        assertions.assertEqual(sol.solving_stats.status, Status.INFEASIBLE)
+        assertions.assertEqual(sol.solving_stats.status, Status.ABORTED)

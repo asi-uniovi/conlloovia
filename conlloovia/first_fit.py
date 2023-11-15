@@ -17,6 +17,7 @@ import time
 
 from cloudmodel.unified.units import Currency, ComputationalUnits, Storage, Requests
 
+
 from conlloovia import problem_helper
 from .model import (
     Problem,
@@ -84,7 +85,9 @@ class FirstFitAllocator:
         """Constructor.
 
         Args:
-            problem: problem to solve"""
+            problem: problem to solve
+            ordering: ordering of the instance classes. It can be CORE_DESCENDING or
+              PRICE_ASCENDING"""
         self.problem = problem
         self.ordering = ordering
 
@@ -171,7 +174,7 @@ class FirstFitAllocator:
                 vm_allocated = self.__try_allocate_vm()
                 if not vm_allocated:
                     logging.debug("No more VMs can be allocated for app %s", app.name)
-                    return self.__create_infeasible_solution()
+                    return self.__create_aborted_solution()
             else:
                 # Check the performance requirement for this app
                 if self.current_perf[app] >= self.__wl_in_period_for_app(app):
@@ -320,15 +323,15 @@ class FirstFitAllocator:
             for vm_info in self.used_vms
         )
 
-    def __create_infeasible_solution(self) -> Solution:
-        """Creates an infeasible solution."""
+    def __create_aborted_solution(self) -> Solution:
+        """Creates an aborted solution."""
         solving_stats = SolvingStats(
             frac_gap=0,
             max_seconds=0,
             lower_bound=0,
             creation_time=self.creation_time,
             solving_time=time.perf_counter() - self.start_solving,
-            status=Status.INFEASIBLE,
+            status=Status.ABORTED,
         )
 
         return Solution(

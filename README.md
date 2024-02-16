@@ -11,6 +11,12 @@ Introduction
 Conlloovia is a Python package to solve allocation problems in Container as a
 Service (CaaS) deployed on Infrastructure as a Service (IaaS) clouds. The
 objective is to optimize the cost from the point of view of the cloud customer.
+It's been published in the paper "[Joint Autoscaling of Containers and Virtual
+Machines for Cost Optimization in Container
+Clusters](https://link.springer.com/article/10.1007/s10723-023-09732-4)".
+Citation:
+
+    Entrialgo, J., García, M., García, J., López, J.M. and Díaz, J.L., 2024. Joint Autoscaling of Containers and Virtual Machines for Cost Optimization in Container Clusters. Journal of Grid Computing, 22(1), pp.1-24. https://doi.org/10.1007/s10723-023-09732-4
 
 Inputs:
 

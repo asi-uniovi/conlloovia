@@ -49,7 +49,17 @@ Optionally, create and activate a virtual environment:
 
 ```bash
 python3 -m venv .venv
+
+To activate it in Linux or MacOS:
+
+```bash
 source .venv/bin/activate
+```
+
+To activate it in Windows:
+
+```bash
+.venv\Scripts\activate
 ```
 
 Install the package with `pip`:
@@ -68,8 +78,8 @@ pip install -e .
 Usage
 -----
 
-You can see [an example](examples/example1.py) of usage in the
-[`examples`](examples) folder. You can run it with:
+You can see [an example](examples/example.py) of usage in the [`examples`](examples)
+folder. You can run it with:
 
 ```bash
 python examples/example.py

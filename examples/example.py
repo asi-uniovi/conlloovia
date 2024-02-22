@@ -1,4 +1,5 @@
 """A simple example of how to use conlloovia."""
+
 import logging
 
 from cloudmodel.unified.units import (
@@ -46,14 +47,12 @@ ccs = (
         cores=ComputationalUnits("1 core"),
         mem=Storage("2 gibibytes"),
         app=apps[0],
-        limit=10,
     ),
     ContainerClass(
         name="2c2g",
         cores=ComputationalUnits("2 core"),
         mem=Storage("2 gibibytes"),
         app=apps[0],
-        limit=10,
     ),
 )
 

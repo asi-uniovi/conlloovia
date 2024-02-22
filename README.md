@@ -49,6 +49,7 @@ Optionally, create and activate a virtual environment:
 
 ```bash
 python3 -m venv .venv
+```
 
 To activate it in Linux or MacOS:
 
@@ -62,7 +63,7 @@ To activate it in Windows:
 .venv\Scripts\activate
 ```
 
-Install the package with `pip`:
+Install the package with `pip` (notice that `git` should be in the `PATH`):
 
 ```bash
 pip install .

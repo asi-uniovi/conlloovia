@@ -142,14 +142,12 @@ ccs = (
         cores=ComputationalUnits("1 core"),
         mem=Storage("2 gibibytes"),
         app=apps[0],
-        limit=10,
     ),
     ContainerClass(
         name="2c2g",
         cores=ComputationalUnits("2 core"),
         mem=Storage("2 gibibytes"),
         app=apps[0],
-        limit=10,
     ),
 )
 
@@ -179,6 +177,15 @@ Optionally, set the logging level to `INFO` to see the output of the solver:
 
 ```python
 logging.basicConfig(level=logging.INFO)
+```
+
+Conlloovia has the option to compute the limits dinamically. To do so, create a
+`LimitsAdapter` and call its `compute_adapted_problem` method:
+
+```python
+from conlloovia.limits import LimitsAdapter
+
+problem = LimitsAdapter(problem=problem).compute_adapted_problem()
 ```
 
 Finally, create an allocator and solve the problem:

@@ -49,7 +49,7 @@ setup(
     packages=find_packages(include=["conlloovia", "conlloovia.*"]),
     test_suite="tests",
     tests_require=test_requirements,
-    url="https://github.com/jentrialgo/conlloovia",
+    url="https://github.com/asi-uniovi/conlloovia/",
     version="0.2.0",
     zip_safe=False,
 )

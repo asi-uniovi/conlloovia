@@ -212,7 +212,7 @@ python-versions = "*"
 
 [[package]]
 name = "pygments"
-version = "2.14.0"
+version = "2.15.0"
 description = "Pygments is a syntax highlighting package written in Python."
 category = "main"
 optional = false
@@ -250,7 +250,7 @@ optional = false
 python-versions = ">=3.7.0"
 
 [package.dependencies]
-markdown-it-py = ">=2.1.0,<3.0.0"
+markdown-it-py = ">=2.2.0,<3.0.0"
 pygments = ">=2.14.0,<3.0.0"
 
 [package.extras]

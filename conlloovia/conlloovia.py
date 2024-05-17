@@ -459,17 +459,36 @@ def _solve_CBC_patched(self, lp, use_mps=True):
     to save a log with cbc's output and take from it the best bound."""
 
     def take_best_bound_from_log(filename, msg: bool):
-        ret = None
+        """Take the lower bound from the log file. If there is a line with "best possible"
+        take the minimum between the lower bound and the best possible because the lower
+        bound is only printed with three decimal digits."""
+        lower_bound = None
+        best_possible = None
         try:
             with open(filename, "r", encoding="utf8") as f:
                 for l in f:
                     if msg:
                         print(l, end="")
+                    if "best possible" in l:
+                        # There are lines like this:
+                        # Cbc0010I After 155300 nodes, 10526 on tree, 0.0015583333 best solution, best possible 0.0015392781 (59.96 seconds)
+                        # or this: 'Cbc0005I Partial search - best objective 0.0015583333 (best possible 0.0015392781), took 5904080 iterations and 121519 nodes (60.69 seconds)\n'
+                        try:
+                            best_possible = float(
+                                l.split("best possible")[-1]
+                                .strip()
+                                .split(" ")[0]
+                                .split(")")[0]
+                            )
+                        except:
+                            pass
                     if l.startswith("Lower bound:"):
-                        ret = float(l.split(":")[-1])
+                        lower_bound = float(l.split(":")[-1])
         except:
             pass
-        return ret
+        if best_possible is not None and lower_bound is not None:
+            return min(lower_bound, best_possible)
+        return lower_bound
 
     if not self.executable(self.path):
         raise PulpSolverError(

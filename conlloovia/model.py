@@ -53,6 +53,9 @@ class InstanceClass:
         object.__setattr__(self, "cores", self.cores.to("cores"))
         object.__setattr__(self, "mem", self.mem.to("gibibytes"))
 
+    def __hash__(self):
+        return hash(self.name)
+
 
 @dataclass(frozen=True)
 class ContainerClass:
@@ -68,6 +71,9 @@ class ContainerClass:
         """Checks dimensions are valid and store them in the standard units."""
         object.__setattr__(self, "cores", self.cores.to("cores"))
         object.__setattr__(self, "mem", self.mem.to("gibibytes"))
+
+    def __hash__(self):
+        return hash(self.name)
 
 
 @dataclass(frozen=True)
@@ -85,6 +91,19 @@ class System:
         new_perfs = {}
         for key, value in self.perfs.items():
             new_perfs[key] = value.to("req/hour")
+
+        # Chech ics and ccs names are unique
+        ics_names = set()
+        for ic in self.ics:
+            if ic.name in ics_names:
+                raise ValueError(f"Instance class name {ic.name} is not unique")
+            ics_names.add(ic.name)
+
+        ccs_names = set()
+        for cc in self.ccs:
+            if cc.name in ccs_names:
+                raise ValueError(f"Container class name {cc.name} is not unique")
+            ccs_names.add(cc.name)
 
         object.__setattr__(self, "perfs", new_perfs)
 

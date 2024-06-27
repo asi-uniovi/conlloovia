@@ -39,7 +39,6 @@ from .model import (
     Container,
     ContainerClass,
     Solution,
-    RequestsPerTime,
     Status,
     SolvingStats,
 )
@@ -82,7 +81,7 @@ class ConllooviaAllocator:
 
         self.container_names: list[str] = []
         self.containers: dict[str, Container] = {}
-        self.container_performances: dict[str, RequestsPerTime] = {}
+        self.container_reqs_in_window: dict[str, float] = {}
         self.container_names_per_app: dict[App, list[str]] = {}
         self.container_names_per_vm: dict[Vm, list[str]] = {}
 
@@ -180,7 +179,11 @@ class ConllooviaAllocator:
                     self.containers[new_container_name] = new_container
                     self.container_names_per_app[cc.app].append(new_container_name)
                     self.container_names_per_vm[new_vm].append(new_container_name)
-                    self.container_performances[new_container_name] = perf
+                    self.container_reqs_in_window[new_container_name] = (
+                        (perf * self.problem.sched_time_size)
+                        .to_reduced_units()
+                        .magnitude
+                    )
 
         logging.info(
             "There are %d X variables and %d Z variables",
@@ -206,12 +209,6 @@ class ConllooviaAllocator:
             for vm in self.vm_names
         )
 
-    def __perf_in_window(self, name: str) -> float:
-        """Returns the number of requests that a container gives in the scheduling window.
-        It receives the name of the variable."""
-        perf_window = self.container_performances[name] * self.problem.sched_time_size
-        return perf_window.to_reduced_units().magnitude
-
     def __create_restrictions(self) -> None:
         """Adds the problem restrictions."""
 
@@ -219,7 +216,7 @@ class ConllooviaAllocator:
         for app in self.problem.system.apps:
             self.lp_problem += (
                 lpSum(
-                    self.z_vars[name] * self.__perf_in_window(name)
+                    self.z_vars[name] * self.container_reqs_in_window[name]
                     for name in self.container_names_per_app[app]
                 )
                 >= self.problem.workloads[app].num_reqs.magnitude,

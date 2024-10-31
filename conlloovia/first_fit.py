@@ -124,12 +124,12 @@ class FirstFitAllocator:
         # Note that app_tuple[1] is a list of container classes, and
         # app_tuple[1][0] is the first container class, which is the smallest
         # container class for the app.
-        self.sorted_apps_ccs_list: list[
-            tuple[App, tuple[ContainerClass, ...]]
-        ] = sorted(
-            sorted_apps_ccs.items(),
-            key=lambda app_tuple: (app_tuple[1][0].cores, app_tuple[1][0].mem),
-            reverse=True,
+        self.sorted_apps_ccs_list: list[tuple[App, tuple[ContainerClass, ...]]] = (
+            sorted(
+                sorted_apps_ccs.items(),
+                key=lambda app_tuple: (app_tuple[1][0].cores, app_tuple[1][0].mem),
+                reverse=True,
+            )
         )
 
         # Current used VMs, initially none
@@ -157,6 +157,7 @@ class FirstFitAllocator:
             solution"""
         self.start_solving = time.perf_counter()
 
+        prev_cc = None
         while self.__perf_below_workload():
             # Take the first app and its container classes
             app, ccs = self.sorted_apps_ccs_list[0]
@@ -166,12 +167,13 @@ class FirstFitAllocator:
             )
 
             # Try to allocate the first container of the app in the current VMs
-            container_allocated = self.__try_allocate_container(ccs[0])
+            container_allocated = self.__try_allocate_container(ccs[0], prev_cc)
+            prev_cc = ccs[0]
 
             if not container_allocated:
                 # Add new VM if possible
                 logging.debug("No VMs available for app %s", app.name)
-                vm_allocated = self.__try_allocate_vm()
+                vm_allocated = self.__try_allocate_vm(ccs[0])
                 if not vm_allocated:
                     logging.debug("No more VMs can be allocated for app %s", app.name)
                     return self.__create_aborted_solution()
@@ -183,6 +185,7 @@ class FirstFitAllocator:
                     self.sorted_apps_ccs_list.pop(0)
 
         self.__optimize_last_vm()
+        self.__remove_unused_vms()
 
         return self.__create_solution()
 
@@ -202,18 +205,28 @@ class FirstFitAllocator:
         """Get the workload in the period for an app."""
         return self.problem.workloads[app].num_reqs
 
-    def __try_allocate_container(self, cc: ContainerClass) -> bool:
+    def __try_allocate_container(
+        self, cc: ContainerClass, prev_cc: ContainerClass
+    ) -> bool:
         """Try to allocate a container of container class cc in the current VMs.
+        If the previous container class prev_cc is given and is equal to cc, the
+        allocation will start in the last VM, because previous VMs are already checked for
+        that cc.
 
         Returns:
             True if the container is allocated, False otherwise"""
-        for vm_info in self.used_vms:
+        if prev_cc == cc:
+            vms_to_check = self.used_vms[-1:]
+        else:
+            vms_to_check = self.used_vms
+
+        for vm_info in vms_to_check:
             vm = vm_info.vm
             ri_list = vm_info.ri_list
             logging.debug(
                 "    Trying to allocate container %s in VM %s", cc.name, vm.name()
             )
-            if vm_info.cc_fits(cc):
+            if (vm.ic, cc) in self.problem.system.perfs and vm_info.cc_fits(cc):
                 logging.debug(
                     "        Allocated container %s in VM %s", cc.name, vm.name()
                 )
@@ -242,8 +255,8 @@ class FirstFitAllocator:
         # Didn't find a VM where the container class fits
         return False
 
-    def __try_allocate_vm(self) -> bool:
-        """Try to allocate a new VM.
+    def __try_allocate_vm(self, cc: ContainerClass) -> bool:
+        """Try to allocate a new VM that can run (has perf info) for cc.
 
         Returns:
             True if a VM can be allocated, False otherwise"""
@@ -251,8 +264,15 @@ class FirstFitAllocator:
             logging.debug("No more ICs available")
             return False
 
-        # Create a new VM with the first IC, i.e., the biggest remaining IC
-        ic = self.sorted_ics[0]
+        # Create a new VM with the first IC that can run cc, i.e., the biggest remaining
+        # IC that has perf info for cc
+        for ic in self.sorted_ics:
+            if (ic, cc) in self.problem.system.perfs:
+                break
+        else:
+            logging.debug("No IC can run cc %s", cc.name)
+            return False
+
         logging.debug("Creating VM with IC %s", ic.name)
         vm = Vm(ic, self.num_vms)
         self.num_vms += 1
@@ -261,7 +281,7 @@ class FirstFitAllocator:
         # Check that we have not reached the maximum number of VMs of this IC
         if self.__num_vms_of_ic(ic) == ic.limit:
             # No more VMs of this IC can be created, so remove it from the list
-            self.sorted_ics.pop(0)
+            self.sorted_ics.remove(ic)
 
         return True
 
@@ -418,6 +438,9 @@ class FirstFitAllocator:
                 app = ri_info.cc.app
                 cc = ri_info.cc
                 ic = vm_info.vm.ic
+                if not (ic, cc) in self.problem.system.perfs:
+                    # This container class cannot be executed in this instance class
+                    return False
                 reqs_provided_period_1_rep = (
                     self.problem.system.perfs[(ic, cc)] * self.problem.sched_time_size
                 )
@@ -429,3 +452,7 @@ class FirstFitAllocator:
                 return False
 
         return True
+
+    def __remove_unused_vms(self) -> None:
+        """Remove the VMs that are not used."""
+        self.used_vms = [vm_info for vm_info in self.used_vms if vm_info.ri_list]

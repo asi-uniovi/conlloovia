@@ -13,10 +13,17 @@ works like this:
 
 from enum import Enum
 from dataclasses import dataclass
+from functools import lru_cache
 import logging
 import time
 
-from cloudmodel.unified.units import Currency, ComputationalUnits, Storage, Requests
+from cloudmodel.unified.units import (
+    Currency,
+    ComputationalUnits,
+    Storage,
+    Requests,
+    RequestsPerTime,
+)
 
 
 from conlloovia import problem_helper
@@ -196,7 +203,7 @@ class FirstFitAllocator:
                     )
                     prev_cc = None
                     while self.current_perf[app] < self.__wl_in_period_for_app(app):
-                        if not (ic, cc) in self.problem.system.perfs:
+                        if not self.ic_can_run_cc(ic, cc):
                             break  # This container class cannot be executed in this IC
 
                         container_allocated = self.__try_allocate_container(cc, prev_cc)
@@ -205,9 +212,10 @@ class FirstFitAllocator:
                         if not container_allocated:
                             # Add new VM if possible
                             logging.debug(
-                                "No VMs available for app %s with cc %s",
+                                "No VMs available for app %s with cc %s. Allocating a new VM of IC %s",
                                 app.name,
                                 cc.name,
+                                ic.name,
                             )
                             vm_allocated = self.__try_allocate_vm(cc)
                             if not vm_allocated:
@@ -228,25 +236,80 @@ class FirstFitAllocator:
                         ]
                         break
 
-        logging.debug(
-            "All ICs have been allocated. Number used vms: %s", len(self.used_vms)
+        logging.info(
+            "All ICs have been allocated. Number of VMs: %d", len(self.used_vms)
         )
         self.__remove_unused_vms()  # There should not be unused VMs, but just in case
         self.__optimize_vms()
 
         return self.__create_solution()
 
+    def ic_can_run_cc(self, ic, cc):
+        return (
+            (ic, cc) in self.problem.system.perfs
+            and cc.cores <= ic.cores
+            and cc.mem <= ic.mem
+        )
+
     def __optimize_vms(self) -> None:
         """Optimize the allocation by trying to fit the containers of each VM in a cheaper
-        VM that can support the workload."""
-
-        logging.debug(
+        VM that can support the workload. For each IC, it only checks if the new IC gives
+        more performance than the current one. This doesn't check if the whole allocation
+        is feasible with the new IC. For that, see __deep_optimize_vms."""
+        logging.info(
             "Optimizing the allocation by trying to replace VMs with cheaper VMs"
         )
 
-        # Get a list of the ICs ordered by price in ascending order, then cores in
-        # descending order and memory in descending order
-        sorted_by_price_ics = sorted(
+        sorted_by_price_ics = self.get_ics_sorted_by_price()
+
+        # Iterate over a copy of the list of used VMs because we will modify it
+        for vm_info in self.used_vms[:]:
+            self.__optimize_vm(sorted_by_price_ics, vm_info)
+
+        # Check that the final allocation is feasible. It should be, but just in case
+        # there is a bug in the code
+        if not self.__is_feasible_alloc():
+            logging.error("The final allocation is not feasible")
+            raise ValueError("The final allocation is not feasible")
+
+    def __optimize_vm(self, sorted_by_price_ics, vm_info):
+        logging.debug("Optimizing VM %s", vm_info.vm.name())
+
+        cores_used, mem_used = self.compute_used_resources(vm_info)
+
+        for ic in sorted_by_price_ics:
+            if ic.price > vm_info.vm.ic.price:
+                logging.debug(
+                    "Price of IC %s is higher than the price of VM %s. Cannot be improved",
+                    ic.name,
+                    vm_info.vm.name(),
+                )
+                return  # Cannot be improved
+
+            if ic == vm_info.vm.ic:
+                continue  # If it is the same IC, we don't need to try to replace it
+
+            if ic.cores < cores_used or ic.mem < mem_used:
+                continue  # This IC cannot fit the containers of the VM, try another one
+
+            if not self.__is_perf_improved(vm_info, ic):
+                continue  # The performance is not improved, try another IC
+
+            self.__replace_vm(vm_info, ic)
+            logging.debug(
+                "    VM %s has been replaced with IC %s", vm_info.vm.name(), ic.name
+            )
+            return  # It has been improved
+
+        logging.debug(
+            "    No IC can replace VM %s. It cannot be improved",
+            vm_info.vm.name(),
+        )
+
+    def get_ics_sorted_by_price(self):
+        """Get a list of the ICs ordered by price in ascending order, then cores in
+        descending order and memory in descending order."""
+        return sorted(
             self.problem.system.ics,
             key=lambda ic: (
                 ic.price.to("usd/h"),
@@ -255,13 +318,69 @@ class FirstFitAllocator:
             ),
         )
 
+    def __replace_vm(self, vm_info, ic):
+        """Replace a VM with a new VM of a different IC. It doesn't check if the new IC
+        gives more performance than the current one. It only replaces the VM and moves
+        the containers. It doesn't check if the whole allocation is feasible with the new
+        IC."""
+        new_vm = Vm(ic, self.num_vms)
+        self.num_vms += 1
+        new_vm_info = VmInfo(new_vm, [])
+
+        # Move the containers from the old VM to the new VM
+        self.__move_containers(vm_info, new_vm_info)
+
+        # Remove the old one and append the new one
+        self.used_vms.remove(vm_info)
+        self.used_vms.append(new_vm_info)
+
+    def __is_perf_improved(self, vm_info, new_ic):
+        """Check if the performance is improved by replacing a VM with a new VM of a
+        different IC. It doesn't check if the whole allocation is feasible with the new
+        IC, just if the performance in rps is higher with the new IC."""
+        # Check that, for each app, the performance in rps is higher with the new IC
+        rps_old = {app: RequestsPerTime("0 req/s") for app in self.problem.system.apps}
+        rps_new = {app: RequestsPerTime("0 req/s") for app in self.problem.system.apps}
+        old_ic = vm_info.vm.ic
+        for ri_info in vm_info.ri_list:
+            cc = ri_info.cc
+            app = cc.app
+            if not (new_ic, cc) in self.problem.system.perfs:
+                return False  # This cc cannot be executed in this ic
+            rps_old[app] += self.problem.system.perfs[(old_ic, cc)].to("req/s")
+            rps_new[app] += self.problem.system.perfs[(new_ic, cc)].to("req/s")
+
+        for app in self.problem.system.apps:
+            if rps_new[app] < rps_old[app]:
+                return False
+
+        return True
+
+    def __deep_optimize_vms(self) -> None:
+        """Optimize the allocation by trying to fit the containers of each VM in a cheaper
+        VM that can support the workload. It's called deep because it tries a new IC and
+        then checks that the whole allocation is feasible, not just if the new IC gives
+        more performance than the current one. If only the latter is checked, there could
+        be situations where the new IC doesn't give more performance but the whole
+        allocation is feasible with it."""
+
+        logging.info(
+            "Optimizing the allocation by trying to replace VMs with cheaper VMs"
+        )
+
+        sorted_by_price_ics = self.get_ics_sorted_by_price()
+
         # Create a dictionary indictaing for each IC if it can be optimized and how, i.e.,
         # with which IC it can be replaced. It's initially empty
         best_ic_to_replace = {}
 
         # Iterate over a copy of the list of used VMs because we will modify it
         for vm_info in self.used_vms[:]:
-            logging.debug("Optimizing VM %s", vm_info.vm.name())
+            logging.info("Optimizing VM %s", vm_info.vm.name())
+
+            # Compute the number of cores and memory used in the VM. It is computed here
+            # instead of in __try_replace_vm to avoid recomputing it for each IC
+            cores_used, mem_used = self.compute_used_resources(vm_info)
 
             for ic in sorted_by_price_ics:
                 # If it is the same IC, we don't need to try to replace it
@@ -277,7 +396,7 @@ class FirstFitAllocator:
                     best_ic_to_replace[vm_info.vm.ic] = None
                     break  # Cannot be improved
 
-                if self.__try_replace_vm(vm_info, ic):
+                if self.__try_replace_vm(vm_info, ic, cores_used, mem_used):
                     logging.debug(
                         "    VM %s has been replaced with IC %s",
                         vm_info.vm.name(),
@@ -292,20 +411,20 @@ class FirstFitAllocator:
                 )
                 best_ic_to_replace[vm_info.vm.ic] = None
 
-    def __try_replace_vm(self, vm_info: VmInfo, ic: InstanceClass) -> bool:
+    def __try_replace_vm(
+        self,
+        vm_info: VmInfo,
+        ic: InstanceClass,
+        cores_used: ComputationalUnits,
+        mem_used: Storage,
+    ) -> bool:
         """Try to replace a VM with a VM of a cheaper IC that can support the workload.
         Returns True if the VM has been replaced, False otherwise. Modifies the
-        allocation."""
+        allocation. The parameters cores_used and mem_used are the number of cores and
+        memory used in the VM, respectively."""
         logging.debug(
             "      Trying to replace VM %s with IC %s", vm_info.vm.name(), ic.name
         )
-
-        # Compute the number of cores and memory used in the VM
-        cores_used = ComputationalUnits("0 cores")
-        mem_used = Storage("0 GB")
-        for ri_src in vm_info.ri_list:
-            cores_used += ri_src.num_replicas * ri_src.cc.cores
-            mem_used += ri_src.num_replicas * ri_src.cc.mem
 
         if ic.cores < cores_used or ic.mem < mem_used:
             return False  # The IC cannot fit the containers of the VM
@@ -338,56 +457,15 @@ class FirstFitAllocator:
 
         return False
 
-    def solve_old(self) -> Solution:
-        """Solve the problem.
-
-        Returns:
-            solution"""
-        self.start_solving = time.perf_counter()
-
-        prev_cc = None
-        while self.__perf_below_workload():
-            # Take the first app and its container classes
-            app, ccs = self.sorted_apps_ccs_list[0]
-
-            logging.debug(
-                "Trying to allocate app %s with ccs %s", app.name, ccs[0].name
-            )
-
-            # Try to allocate the first container of the app in the current VMs
-            container_allocated = self.__try_allocate_container(ccs[0], prev_cc)
-            prev_cc = ccs[0]
-
-            if not container_allocated:
-                # Add new VM if possible
-                logging.debug("No VMs available for app %s", app.name)
-                vm_allocated = self.__try_allocate_vm(ccs[0])
-                if not vm_allocated:
-                    logging.debug("No more VMs can be allocated for app %s", app.name)
-                    return self.__create_aborted_solution()
-            else:
-                # Check the performance requirement for this app
-                if self.current_perf[app] >= self.__wl_in_period_for_app(app):
-                    # Remove the app from the list of apps because it is
-                    # already allocated
-                    self.sorted_apps_ccs_list.pop(0)
-
-        self.__optimize_last_vm()
-        self.__remove_unused_vms()
-
-        return self.__create_solution()
-
-    def __perf_below_workload(self) -> bool:
-        """Check if the current performance is below the workload for any app.
-
-        Returns:
-            True if the current performance is below the workload for any app,
-            False otherwise"""
-        for app in self.problem.system.apps:
-            if self.current_perf[app] < self.__wl_in_period_for_app(app):
-                return True
-
-        return False
+    @staticmethod
+    def compute_used_resources(vm_info) -> tuple[ComputationalUnits, Storage]:
+        """Compute the number of cores and memory used in a VM."""
+        cores_used = ComputationalUnits("0 cores")
+        mem_used = Storage("0 GB")
+        for ri_src in vm_info.ri_list:
+            cores_used += ri_src.num_replicas * ri_src.cc.cores
+            mem_used += ri_src.num_replicas * ri_src.cc.mem
+        return cores_used, mem_used
 
     def __wl_in_period_for_app(self, app) -> Requests:
         """Get the workload in the period for an app."""
@@ -412,7 +490,10 @@ class FirstFitAllocator:
             vm = vm_info.vm
             ri_list = vm_info.ri_list
             logging.debug(
-                "    Trying to allocate container %s in VM %s", cc.name, vm.name()
+                "    Trying to allocate container %s in VM %s. Remaining perf: %s",
+                cc.name,
+                vm.name(),
+                self.__wl_in_period_for_app(cc.app) - self.current_perf[cc.app],
             )
             if (vm.ic, cc) in self.problem.system.perfs and vm_info.cc_fits(cc):
                 logging.debug(
@@ -455,7 +536,7 @@ class FirstFitAllocator:
         # Create a new VM with the first IC that can run cc, i.e., the biggest remaining
         # IC that has perf info for cc
         for ic in self.sorted_ics:
-            if (ic, cc) in self.problem.system.perfs:
+            if self.ic_can_run_cc(ic, cc):
                 break
         else:
             logging.debug("No IC can run cc %s", cc.name)
@@ -540,73 +621,6 @@ class FirstFitAllocator:
             solving_stats=solving_stats,
         )
 
-    def __optimize_last_vm(self) -> None:
-        """Optimize the allocation by trying to fit the containers from the last
-        VM into smaller VMs."""
-        if len(self.used_vms) == 0:
-            # No VM is used
-            return
-
-        last_used_vm_info = self.used_vms[-1]
-
-        # Compute the number of cores and memory used in the last VM
-        cores_used = ComputationalUnits("0 cores")
-        mem_used = Storage("0 GB")
-        for ri_src in last_used_vm_info.ri_list:
-            cores_used += ri_src.num_replicas * ri_src.cc.cores
-            mem_used += ri_src.num_replicas * ri_src.cc.mem
-
-        # We will try to use the cheapest VM that can fit the containers from
-        # the last VM while obtaining a feasible solution. First, we order the
-        # remaining ICs by price in ascending order
-        sorted_ics_price_asc = sorted(self.sorted_ics, key=lambda ic: ic.price)
-
-        for ic in sorted_ics_price_asc:
-            if not (ic.cores >= cores_used and ic.mem >= mem_used):
-                continue  # This IC cannot fit the containers from the last VM
-
-            # Create a new VM with this IC
-            logging.debug("Creating VM with IC %s", ic.name)
-            new_vm = Vm(ic, self.num_vms)
-            self.num_vms += 1
-            new_vm_info = VmInfo(new_vm, [])
-
-            # Remove the old one and append the new one
-            self.used_vms.pop()
-            self.used_vms.append(new_vm_info)
-
-            # Move the containers from the last VM to the new VM
-            self.__move_containers(last_used_vm_info, new_vm_info)
-
-            # Check that the allocation is still feasible
-            if self.__is_feasible_alloc():
-                return  # It is, we are done
-
-            # It's not feasible, so undo the changes
-            logging.debug(
-                "The allocation is not feasible after moving the containers "
-                "from the last VM. Undoing the changes..."
-            )
-            self.__move_containers(new_vm_info, last_used_vm_info)
-            self.used_vms.pop()
-            self.used_vms.append(last_used_vm_info)
-
-        logging.debug(
-            "No cheaper VM that can fit the containers from the last VM"
-            " while maintaining a feasible allocation."
-        )
-
-    # TODO: remove. This was added in a test but is not used
-    def __ic_cannot_allocate_ris(
-        self, ic: InstanceClass, ris: list[ReplicaInfo]
-    ) -> bool:
-        """Check if an instance class has performance data for all the container classes
-        in a list of replica infos."""
-        for ri in ris:
-            if not (ic, ri.cc) in self.problem.system.perfs:
-                return True
-        return False
-
     def __move_containers(self, src: VmInfo, dst: VmInfo) -> None:
         """Move the containers from one VM to another."""
         for ri_src in src.ri_list:
@@ -638,7 +652,8 @@ class FirstFitAllocator:
 
         # Check that the performance is enough for each app
         for app in self.problem.system.apps:
-            if provided_reqs[app] < self.problem.workloads[app].num_reqs:
+            extra_reqs = provided_reqs[app] - self.problem.workloads[app].num_reqs
+            if extra_reqs < Requests("-1e-9 req"):  # Allow a small error
                 return False
 
         return True

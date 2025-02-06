@@ -39,6 +39,14 @@ def system_1ic_1cc_1app() -> System:
             mem=Storage("2 gibibytes"),
             app=apps[0],
         ),
+        # This one is used to test that the allocator can't allocate it because there's no
+        # instance class that can run it, which is indicated by having no performance data
+        ContainerClass(
+            name="0.5c0.5g-no-perf",
+            cores=ComputationalUnits("0.5 cores"),
+            mem=Storage("0.5 gibibytes"),
+            app=apps[0],
+        ),
     )
 
     base_perf = RequestsPerTime("1 req/s")

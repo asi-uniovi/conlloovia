@@ -53,14 +53,19 @@ class TestSystem1ic1cc:
 
         assert list(containers_dict.keys()) == [
             "m5.xlarge-0-1c2g",
+            "m5.xlarge-0-0.5c0.5g-no-perf",
             "m5.xlarge-1-1c2g",
+            "m5.xlarge-1-0.5c0.5g-no-perf",
             "m5.xlarge-2-1c2g",
+            "m5.xlarge-2-0.5c0.5g-no-perf",
             "m5.xlarge-3-1c2g",
+            "m5.xlarge-3-0.5c0.5g-no-perf",
             "m5.xlarge-4-1c2g",
+            "m5.xlarge-4-0.5c0.5g-no-perf",
         ]
 
         for container in containers_dict.values():
-            assert container.cc == problem.system.ccs[0]
+            assert container.cc in problem.system.ccs
 
 
 class TestSystem2ic2cc:

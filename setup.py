@@ -15,7 +15,7 @@ requirements = [
     "pint",
     "pulp",
     "rich",
-    "cloudmodel @ git+https://jentrialgo@github.com/jldiaz-uniovi/cloudmodel.git#egg=cloudmodel",
+    "cloudmodel @ git+https://github.com/asi-uniovi/cloudmodel.git@d987309f2a8be2d8af028fe132a5b0ff65fa801b#egg=cloudmodel",
 ]
 
 test_requirements = [

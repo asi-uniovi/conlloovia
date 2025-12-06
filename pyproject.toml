@@ -12,7 +12,7 @@ click = "^8.1.3"
 pulp = "^2.7.0"
 pint = "^0.20.1"
 rich = "^13.3.1"
-cloudmodel = { git = "https://github.com/asi-uniovi/cloudmodel.git", rev = "d987309f2a8be2d8af028fe132a5b0ff65fa801b" }
+cloudmodel = { git = "https://github.com/asi-uniovi/cloudmodel.git", rev = "045eae5f04a31786d29f4cb55271e1b47b42bfd4" }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.2.0"
